@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Build and Package All Platforms
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [ -z "$TAG" ]; then
+            TAG="v1.0.1"
+          fi
+          echo "Building release for tag: $TAG"
+
+          mkdir -p bin dist
+
+          # 1. Linux AMD64
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
+          tar -czvf "dist/tdocs-${TAG}-linux-amd64.tar.gz" -C bin tdocs
+
+          # 2. Linux ARM64
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
+          tar -czvf "dist/tdocs-${TAG}-linux-arm64.tar.gz" -C bin tdocs
+
+          # 3. macOS Intel (AMD64)
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
+          tar -czvf "dist/tdocs-${TAG}-darwin-amd64.tar.gz" -C bin tdocs
+
+          # 4. macOS Apple Silicon (ARM64)
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
+          tar -czvf "dist/tdocs-${TAG}-darwin-arm64.tar.gz" -C bin tdocs
+
+          # 5. Windows AMD64
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs.exe ./cmd/tdocs
+          tar -czvf "dist/tdocs-${TAG}-windows-amd64.tar.gz" -C bin tdocs.exe
+          (cd bin && zip -9 "../dist/tdocs-${TAG}-windows-amd64.zip" tdocs.exe)
+
+          # 6. SHA-256 Checksums
+          cd dist
+          sha256sum tdocs-* > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          tag_name: ${{ github.ref_name }}
+          name: tDocs ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js for npm publish
+        if: env.NPM_TOKEN != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish package to npm
+        if: env.NPM_TOKEN != ''
+        run: |
+          TAG_VER="${GITHUB_REF_NAME#v}"
+          npm version "${TAG_VER}" --no-git-tag-version --allow-same-version
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+

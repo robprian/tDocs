@@ -1,0 +1,19 @@
+# Keep the build context to source only: without this the 66 MB local binary,
+# SQLite db, session key and screenshots are all shipped to the daemon.
+# Patterns are anchored with a leading "/" so they only match context-root
+# entries (e.g. "/tdocs" must not also hide the cmd/tdocs source directory).
+.git
+.github
+.scratch
+.verify7
+/tdocs
+/tdocs.log
+/.tdocs.pid
+/bin
+*.db
+*.db-wal
+*.db-shm
+*.key
+.env
+references.png
+node_modules

@@ -1,0 +1,31 @@
+# Runtime data & secrets — never commit
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+.env
+*.key
+.tdocs.pid
+tdocs.log
+*.log
+
+# Build artifacts
+tdocs
+tdocs.exe
+bin/
+dist/
+
+# Agent scratch & QA captures
+.scratch/
+*.png
+!docs/screenshots/*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# local tooling
+.commandcode/
+.verify7/

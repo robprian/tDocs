@@ -1,0 +1,29 @@
+# tDocs — sekali jalan via Docker.
+#
+#   1. cp .env.example .env   # isi TDOCS_TG_APP_ID + TDOCS_TG_APP_HASH
+#   2. docker compose up -d --build
+#   3. docker compose exec tdocs tdocs login   # pairing OTP (sekali saja)
+#   4. Buka http://localhost:8080
+#
+# Data (SQLite + .tdocs.key) menetap di volume tdocs-data.
+
+services:
+  tdocs:
+    build: .
+    image: tdocs:2.0.0
+    container_name: tdocs
+    env_file:
+      - .env
+    environment:
+      TDOCS_DB_PATH: /data/tdocs.db
+      TDOCS_HOST: 0.0.0.0
+      TDOCS_PORT: 8080
+      TDOCS_NO_BROWSER: 1
+    ports:
+      - "${TDOCS_PORT:-8080}:8080"
+    volumes:
+      - tdocs-data:/data
+    restart: unless-stopped
+
+volumes:
+  tdocs-data:

@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tDocs &mdash; Personal Cloud Storage</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
+    <link rel="stylesheet" href="/static/style.css?v=26">
+</head>
+<body>
+    <!-- Header: brand + global search + account actions on one row. Under 860px
+         the search collapses to an icon toggle (see the responsive block). -->
+    <header class="header" id="app-header">
+        <button class="btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle Sidebar" aria-expanded="false" aria-controls="sidebar">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <a href="/" class="header-brand" aria-label="tDocs home">
+            <img src="/static/logo.png" alt="tDocs" class="brand-logo">
+            <span class="brand-text">tDocs</span>
+        </a>
+
+        <div class="header-search" role="search">
+            <div class="search-wrapper">
+                <span class="search-icon-left">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                <input type="search" class="search-input" id="search-box" placeholder="Search files…" autocomplete="off" aria-label="Search files">
+                <span class="search-kbd">Ctrl K</span>
+                <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()" aria-label="Clear Search">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+            </button>
+            <div class="notif-wrap">
+                <button class="btn-icon" id="notif-bell-btn" onclick="toggleNotifDropdown(event)" title="Notifications">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                    <span id="notif-badge" class="notif-badge" style="display: none;"></span>
+                </button>
+                <div id="notif-dropdown" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px); width: min(360px, calc(100vw - 32px)); max-height: 420px; overflow-y: auto;"></div>
+            </div>
+            <button class="btn-icon" onclick="openHelpModal()" title="Help &amp; How It Works">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
+            <div style="position: relative;">
+                <button class="header-avatar" id="avatar-btn" onclick="toggleAvatarMenu(event)" title="Account">RA</button>
+                <div id="avatar-menu" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px);">
+                    <button class="dropdown-item" onclick="switchTab('settings')">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <span>Settings</span>
+                    </button>
+                    <a class="dropdown-item" href="/docs" style="text-decoration: none;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>API Docs</span>
+                    </a>
+                    <a class="dropdown-item" href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+                        <span>GitHub</span>
+                    </a>
+                    <a class="dropdown-item danger" href="/logout" style="text-decoration: none;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <span>Sign Out</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- 3-column layout shell -->
+    <div class="layout-shell">
+
+        <button class="sidebar-collapse-handle" id="sidebar-collapse-handle" title="Collapse sidebar" aria-label="Collapse sidebar">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+
+            <a href="/" class="sidebar-brand" aria-label="tDocs home">
+                <img id="brand-logo-img" src="/static/logo-light.png" data-dark-src="/static/logo.png" alt="tDocs" class="brand-logo">
+            </a>
+
+            <div class="sidebar-actions">
+                <button class="btn btn-primary" style="width: 100%;" onclick="openFilePicker()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Upload File</span>
+                </button>
+                <input type="file" id="file-input" multiple style="display: none;">
+                <button class="btn btn-secondary" style="width: 100%;" onclick="createFolderPrompt()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+                    <span>New Folder</span>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section-label">Menu</div>
+                <a class="nav-link nav-blue active" id="nav-overview" onclick="switchTab('overview')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                    <span>Overview</span>
+                </a>
+                <a class="nav-link nav-blue" id="nav-drive" onclick="switchTab('drive')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+                    <span>All Files</span>
+                </a>
+                <a class="nav-link nav-orange" id="nav-favorites" onclick="switchTab('favorites')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>Favorites</span>
+                </a>
+                <a class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <span>Shared Links</span>
+                </a>
+                <a class="nav-link nav-red" id="nav-trash" onclick="switchTab('trash')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    <span>Trash</span>
+                </a>
+
+                <div class="sidebar-section-label">Storage</div>
+                <a class="nav-link nav-green" id="nav-storage" onclick="switchTab('storage')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                    <span>Sync Center</span>
+                </a>
+                <a class="nav-link nav-green" id="nav-snapshots" onclick="switchTab('snapshots')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                    <span>Snapshots</span>
+                </a>
+
+                <div class="sidebar-section-label">Media</div>
+                <a class="nav-link nav-purple" id="nav-music" onclick="switchTab('music')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <span>Music</span>
+                </a>
+                <a class="nav-link nav-purple" id="nav-videos" onclick="switchTab('videos')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+                    <span>Videos</span>
+                </a>
+                <a class="nav-link nav-purple" id="nav-images" onclick="switchTab('images')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <span>Images</span>
+                </a>
+
+                <div class="sidebar-section-label">System</div>
+                <a class="nav-link nav-gray" id="nav-settings" onclick="switchTab('settings')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg>
+                    <span>Settings</span>
+                </a>
+            </nav>
+
+
+            <div class="sidebar-foot">
+                <div><strong>tDocs v2.0.0</strong> &bull; MIT License</div>
+                <div>Created by <a href="https://github.com/robprian" target="_blank" rel="noopener noreferrer">Robby Aprianto</a></div>
+                <div><a href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted);">GitHub</a> &bull; <a href="/docs" style="color: var(--text-muted);">API Docs</a> &bull; <a href="/api/openapi.json" style="color: var(--text-muted);">OpenAPI</a></div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content-area">
+
+            <!-- Setup Wizard Banner (only when Telegram not yet paired) -->
+            <div id="telegram-setup-banner" class="wizard-banner" style="display: none;">
+                <div class="wizard-banner-icon">
+                    <svg class="icon icon-lg" viewBox="0 0 24 24" style="color: var(--primary);"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 15L22 2Z"/></svg>
+                </div>
+                <div class="wizard-banner-body">
+                    <div class="wizard-banner-title">Telegram not paired yet</div>
+                    <div class="wizard-banner-sub">Connect Telegram storage to start storing files. Authentication happens through Telegram; tDocs never stores your Telegram password.</div>
+                </div>
+                <button class="btn btn-primary" onclick="openTelegramWizard()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 15L22 2Z"/></svg>
+                    Start Setup
+                </button>
+            </div>
+
+            <!-- Overview Dashboard Tab -->
+            <div id="overview-content-container">
+                <div class="overview-cols">
+                    <div class="overview-main">
+                        <div class="welcome-banner">
+                            <div class="welcome-copy">
+                                <span class="welcome-kicker">Good morning,</span>
+                                <h1>Welcome back, Robby!</h1>
+                                <p>Your files are safe and always accessible.</p>
+                            </div>
+                            <div class="welcome-art" aria-hidden="true">
+                                <svg viewBox="0 0 200 120" class="welcome-illustration">
+                                    <ellipse cx="70" cy="88" rx="46" ry="10" fill="rgba(47,107,255,.12)"/>
+                                    <path d="M52 78h72a26 26 0 1 0-6.4-51.2A34 34 0 0 0 52 40a20 20 0 0 0 0 38Z" fill="url(#welcomeCloud)"/>
+                                    <path d="M132 40l26-14-8 22 12 3-30 12 6-14-6-9Z" fill="#4f8bff"/>
+                                    <circle cx="150" cy="30" r="3" fill="#9cc0ff"/>
+                                    <circle cx="163" cy="46" r="2" fill="#bcd4ff"/>
+                                    <defs>
+                                        <linearGradient id="welcomeCloud" x1="0" y1="0" x2="1" y2="1">
+                                            <stop offset="0" stop-color="#6ea8ff"/>
+                                            <stop offset="1" stop-color="#2f6bff"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div id="ov-folders-section" style="display: none;">
+                            <div class="section-header">
+                                <div class="section-title">My Folders</div>
+                                <button class="btn btn-ghost btn-sm" onclick="createFolderPrompt()">
+                                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+                                    New Folder
+                                </button>
+                            </div>
+                            <div id="ov-folders-grid" class="folder-grid"></div>
+                        </div>
+
+                        <div class="panel-card">
+                            <div class="recent-head">
+                                <div class="section-title">Recent Files</div>
+                                <div class="recent-head-actions">
+                                    <button class="details-link" onclick="switchTab('drive')">View All</button>
+                                    <span class="recent-view-toggle" role="group" aria-label="Recent files layout">
+                                        <button class="recent-view-btn active" onclick="switchTab('drive'); setViewMode('grid')" title="Grid view">
+                                            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                                        </button>
+                                        <button class="recent-view-btn" onclick="switchTab('drive'); setViewMode('list')" title="List view">
+                                            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="recent-cols"><span>Name</span><span>Modified</span><span>Size</span><span>Favorite</span><span></span></div>
+                            <div id="ov-recent-list" class="recent-list"></div>
+                        </div>
+
+                        <div id="ov-dropzone" class="dropzone upload-row">
+                            <div class="upload-row-left">
+                                <span class="upload-row-icon">
+                                    <svg class="icon" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+                                </span>
+                                <div class="upload-row-copy">
+                                    <span class="upload-row-title">Drag and drop files here to upload</span>
+                                    <span class="upload-row-sub">Supports all file types up to 2GB per file</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="openFilePicker()">Upload</button>
+                        </div>
+                    </div>
+
+                    <aside class="right-rail">
+                        <div class="rail-card">
+                            <div class="rail-card-head"><span class="rail-card-title">Storage</span></div>
+                            <div class="rail-gauge">
+                                <svg id="ov-gauge" viewBox="0 0 120 120" class="gauge"></svg>
+                                <div class="gauge-center">
+                                    <div id="ov-used" class="gauge-used">—</div>
+                                    <div class="gauge-cap">used</div>
+                                </div>
+                            </div>
+                            <div class="rail-gauge-foot">
+                                <span class="rail-gauge-label">Telegram Cloud</span>
+                                <span class="rail-gauge-pill">Unlimited</span>
+                            </div>
+                        </div>
+
+                        <div class="rail-card">
+                            <div class="rail-card-head">
+                                <span class="rail-card-title">Telegram</span>
+                                <span id="tg-state-pill" class="tg-state-pill">Checking…</span>
+                            </div>
+                            <div class="rail-row">
+                                <span class="status-dot" id="status-dot"></span>
+                                <span id="status-label" class="rail-row-main">Checking…</span>
+                            </div>
+                            <div class="rail-kv">
+                                <div class="rail-kv-row"><span>Storage Channel</span><strong id="status-channel">—</strong></div>
+                                <div class="rail-kv-row"><span>Files indexed</span><strong id="status-files">0</strong></div>
+                            </div>
+                            <button class="btn btn-primary btn-block btn-sm" onclick="syncChannelNow()" title="Rebuild the file list from the Telegram Storage Channel">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                                Sync Now
+                            </button>
+                        </div>
+
+                        <div class="rail-card">
+                            <div class="rail-card-head"><span class="rail-card-title">Categories</span></div>
+                            <div id="ov-breakdown" class="breakdown-list cat-list"></div>
+                        </div>
+
+                        <div class="rail-card">
+                            <div class="rail-card-head"><span class="rail-card-title">Quick Actions</span></div>
+                            <div class="quick-actions">
+                                <button class="quick-action" onclick="openFilePicker()">
+                                    <span class="qa-icon qa-blue"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                                    <span>Upload Files</span>
+                                </button>
+                                <button class="quick-action" onclick="createFolderPrompt()">
+                                    <span class="qa-icon qa-amber"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></span>
+                                    <span>New Folder</span>
+                                </button>
+                                <button class="quick-action" onclick="switchTab('trash')">
+                                    <span class="qa-icon qa-rose"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span>
+                                    <span>Empty Trash</span>
+                                </button>
+                                <button class="quick-action" onclick="switchTab('settings')">
+                                    <span class="qa-icon qa-slate"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg></span>
+                                    <span>Settings</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="rail-card">
+                            <div class="rail-card-head"><span class="rail-card-title">System Status</span></div>
+                            <div class="sys-list">
+                                <div class="sys-row"><span class="sys-icon sys-blue"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 15 22 2Z"/></svg></span><div><div class="sys-name">Storage</div><div class="sys-sub">Telegram MTProto</div></div></div>
+                                <div class="sys-row"><span class="sys-icon sys-amber"><svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg></span><div><div class="sys-name">Database</div><div class="sys-sub">Local SQLite</div></div></div>
+                                <div class="sys-row"><span class="sys-icon sys-green"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><div class="sys-name">Encryption</div><div class="sys-sub">AES-256-GCM</div></div></div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+
+                <!-- Stat cards kept out of the reference composition; the numbers
+                     already appear in the rail, so the node stays hidden. -->
+                <div id="ov-stat-cards" class="stat-cards" hidden></div>
+            </div>
+
+            <!-- Drive Content Tab -->
+            <div id="drive-content-container" style="display: none;">
+                <div id="dropzone" class="dropzone">
+                    <div style="color: var(--primary);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <div>
+                        <span style="font-weight: 700; color: var(--text-primary);">Drag & drop files here</span>
+                        <span style="color: var(--text-muted);"> or browse from your device</span>
+                    </div>
+                </div>
+
+                <div id="search-banner" class="search-banner" style="display: none;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        <span id="search-banner-text">Searching...</span>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.78rem;" onclick="clearSearch()">Clear Search</button>
+                </div>
+
+                <div id="filter-bar" class="filter-bar">
+                    <select id="filter-mime" class="form-input" style="max-width: 150px;" onchange="applyDriveFilters()" title="Type filter">
+                        <option value="">All types</option>
+                        <option value="image/">Images</option>
+                        <option value="video/">Videos</option>
+                        <option value="audio/">Audio</option>
+                        <option value="application/pdf">PDF</option>
+                        <option value="text/">Documents</option>
+                    </select>
+                    <select id="filter-size" class="form-input" style="max-width: 150px;" onchange="applyDriveFilters()" title="Size filter">
+                        <option value="">Any size</option>
+                        <option value="0-1048576">Under 1 MB</option>
+                        <option value="1048576-104857600">1 – 100 MB</option>
+                        <option value="104857600-1073741824">100 MB – 1 GB</option>
+                        <option value="1073741824-0">Over 1 GB</option>
+                    </select>
+                    <button class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.78rem;" onclick="clearDriveFilters()">Reset</button>
+                    <span id="filter-status" style="font-size: 0.78rem; color: var(--text-muted);"></span>
+                </div>
+
+                <div id="bulk-bar" class="bulk-bar" style="display: none;">
+                    <span id="bulk-count" style="font-weight: 700; font-size: 0.86rem;"></span>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="bulkMovePrompt()">Move</button>
+                        <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="bulkFavorite()">Favorite</button>
+                        <button class="btn btn-danger" style="padding: 6px 14px; font-size: 0.78rem;" onclick="bulkTrash()">Trash</button>
+                        <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="clearSelection()">Clear</button>
+                    </div>
+                </div>
+
+                <div class="content-header">
+                    <nav id="breadcrumbs" class="breadcrumbs"></nav>
+                    <div class="toolbar-controls">
+                        <div class="view-switcher">
+                            <button class="view-btn active" id="btn-view-grid" onclick="setViewMode('grid')" title="Grid View">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                            </button>
+                            <button class="view-btn" id="btn-view-list" onclick="setViewMode('list')" title="List View">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="grid-view-container">
+                    <div id="folders-section" style="display: none;">
+                        <div class="section-header"><div class="section-title">Virtual Folders</div></div>
+                        <div id="folders-grid" class="grid"></div>
+                    </div>
+                    <div id="files-section" style="display: none;">
+                        <div class="section-header"><div class="section-title">Files</div></div>
+                        <div id="files-grid" class="grid"></div>
+                    </div>
+                </div>
+
+                <div id="list-view-container" style="display: none;">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px;"><input type="checkbox" class="select-check" onclick="toggleSelectAll(this)" title="Select all"></th>
+                                    <th class="sortable" data-field="name" onclick="setSort('name')">Name<span class="sort-ind"></span></th>
+                                    <th class="sortable" data-field="size" onclick="setSort('size')" style="width: 130px;">Size<span class="sort-ind"></span></th>
+                                    <th class="sortable" data-field="date" onclick="setSort('date')" style="width: 160px;">Modified<span class="sort-ind"></span></th>
+                                    <th style="width: 140px; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="empty-drive-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+                    <h3>This folder is empty</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Upload files or create subfolders to start storing data.</p>
+                    <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; justify-content: center;">
+                        <button class="btn btn-primary" onclick="openFilePicker()">Upload Files</button>
+                        <button class="btn btn-secondary" onclick="createFolderPrompt()">New Folder</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shared Links Tab -->
+            <div id="shares-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Active Public Share Links</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Review all public links created for your virtual files. Revoke access at any time.</p>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Target File</th><th style="width: 120px;">Size</th><th style="width: 140px;">Password</th><th style="width: 160px;">Expires</th><th style="width: 110px;">Downloads</th><th style="width: 200px;">Actions</th></tr>
+                        </thead>
+                        <tbody id="shares-table-body"></tbody>
+                    </table>
+                </div>
+                <div id="empty-shares-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <h3>No active share links</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Generate share links from any file's action menu.</p>
+                </div>
+            </div>
+
+            <!-- Snapshots Tab -->
+            <div id="snapshots-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 20px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Database Snapshots &amp; Point-in-Time Restore</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Consistent SQLite snapshots stored in your Telegram Storage Channel with rolling retention.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <input type="file" id="snapshot-upload-input" accept=".gz,.db" style="display: none;" onchange="handleSnapshotFileSelect(event)">
+                        <button class="btn btn-secondary" onclick="syncChannelNow()" id="btn-sync-channel" title="Rebuild the file list from the Storage Channel">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                            <span id="sync-channel-text">Sync from Channel</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('snapshot-upload-input').click()" title="Upload and restore a local .db.gz backup">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span>Upload &amp; Restore</span>
+                        </button>
+                        <button class="btn btn-primary" id="btn-create-snapshot" onclick="createSnapshotNow()">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                            <span id="create-snapshot-text">Create Snapshot Now</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                    <div class="stat-card"><span class="stat-label">Scheduler</span><span style="display:flex;align-items:center;gap:6px;font-weight:700;"><span class="status-dot"></span><span>Every 24h</span></span></div>
+                    <div class="stat-card"><span class="stat-label">Retention</span><span style="font-weight:700;">Rolling (5 kept)</span></div>
+                    <div class="stat-card"><span class="stat-label">Vault</span><span style="font-weight:700;color:var(--success);">Pinned + Retained</span></div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Snapshot File</th><th style="width: 120px;">Size</th><th style="width: 130px;">Msg</th><th style="width: 180px;">Created</th><th style="width: 130px;">Status</th><th style="width: 200px; text-align: right;">Actions</th></tr>
+                        </thead>
+                        <tbody id="snapshots-table-body"></tbody>
+                    </table>
+                </div>
+                <div id="empty-snapshots-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                    <h3>No database snapshots found</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Create your first snapshot now or wait for the automated 24-hour scheduler.</p>
+                </div>
+            </div>
+
+            <!-- Media Library Tab (shared by Music / Videos / Images nav) -->
+            <div id="media-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 14px;">
+                    <div>
+                        <h2 id="media-section-title" style="font-size: 1.3rem; font-weight: 800;">Media Library</h2>
+                        <p id="media-section-sub" style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Music, videos and images with built-in playback.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="btn-media-playall" onclick="mediaPlayAll()">Play All</button>
+                    </div>
+                </div>
+                <div class="filter-bar">
+                    <div class="view-switcher" id="media-kind-switch">
+                        <button class="view-btn active" data-kind="" onclick="setMediaKind('')" title="All media" style="width:auto;padding:0 14px;font-size:0.78rem;font-weight:700;">All</button>
+                        <button class="view-btn" data-kind="audio/" onclick="setMediaKind('audio/')" title="Music" style="width:auto;padding:0 14px;font-size:0.78rem;font-weight:700;">Music</button>
+                        <button class="view-btn" data-kind="video/" onclick="setMediaKind('video/')" title="Videos" style="width:auto;padding:0 14px;font-size:0.78rem;font-weight:700;">Videos</button>
+                        <button class="view-btn" data-kind="image/" onclick="setMediaKind('image/')" title="Images" style="width:auto;padding:0 14px;font-size:0.78rem;font-weight:700;">Images</button>
+                    </div>
+                    <input type="text" id="media-search" class="form-input" style="max-width: 220px;" placeholder="Search media…" oninput="mediaSearchChanged(this.value)">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);cursor:pointer;">
+                        <input type="checkbox" id="media-fav-only" class="select-check" onchange="loadMediaLibrary()"> Starred only
+                    </label>
+                </div>
+                <div id="media-recent-section" style="display: none;">
+                    <div class="section-header"><div class="section-title">Recently Played</div></div>
+                    <div id="media-recent-list" class="recent-list" style="margin-bottom: 10px;"></div>
+                </div>
+                <div id="media-grid" class="grid"></div>
+                <div id="empty-media-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+                    <h3>No media found</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Upload music, videos or images to build your library.</p>
+                </div>
+            </div>
+
+            <!-- Favorites Tab -->
+            <div id="favorites-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Favorites</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Starred files for quick access.</p>
+                    </div>
+                </div>
+                <div id="favorites-grid" class="grid"></div>
+                <div id="empty-favorites-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <h3>No favorites yet</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Star any file to pin it here.</p>
+                </div>
+            </div>
+
+            <!-- Sync Center Tab -->
+            <div id="storage-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Telegram Sync Center</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Storage backend health, catalog sync history and recovery.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" id="btn-test-connection" onclick="testTelegramConnection()"><span id="test-conn-text">Test Connection</span></button>
+                        <button class="btn btn-secondary" id="btn-sync-now" onclick="syncCenterNow()"><span id="sync-center-text">Sync Now</span></button>
+                        <button class="btn btn-secondary" id="btn-verify-now" onclick="verifyStorageNow()"><span id="verify-text">Verify Storage</span></button>
+                        <button class="btn btn-primary" onclick="createSnapshotNow(); switchTab('snapshots');">Snapshot Now</button>
+                    </div>
+                </div>
+                <div id="verify-results" style="margin-bottom: 18px;"></div>
+                <div id="sync-backend-notice" style="display: none; margin-bottom: 18px; padding: 16px 18px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);"></div>
+                <div id="storage-health" class="stat-cards" style="margin-bottom: 18px;"></div>
+                <div class="section-header"><div class="section-title">Sync History</div><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="loadStorageCenter()">Refresh</button></div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th style="width: 80px;">Run</th><th style="width: 160px;">Started</th><th style="width: 110px;">Trigger</th><th style="width: 100px;">Scanned</th><th style="width: 110px;">Recovered</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="sync-runs-body"></tbody>
+                    </table>
+                </div>
+                <div id="empty-sync-runs-state" class="empty-state" style="display: none;">
+                    <h3>No sync runs recorded yet</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Press Sync Now to rebuild the catalog from the Storage Channel.</p>
+                </div>
+            </div>
+
+            <!-- Trash Tab -->
+            <div id="trash-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Trash</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Deleted files and folders. Restore or purge forever.</p>
+                    </div>
+                    <button class="btn btn-danger" onclick="emptyTrashConfirm()">Empty Trash</button>
+                </div>
+                <div id="trash-folders-section" style="display: none;">
+                    <div class="section-header"><div class="section-title">Folders</div></div>
+                    <div id="trash-folders-grid" class="grid"></div>
+                </div>
+                <div id="trash-files-section" style="display: none;">
+                    <div class="section-header"><div class="section-title">Files</div></div>
+                    <div id="trash-files-grid" class="grid"></div>
+                </div>
+                <div id="empty-trash-state" class="empty-state" style="display: none;">
+                    <svg class="empty-icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    <h3>Trash is empty</h3>
+                    <p style="font-size: 0.86rem; color: var(--text-muted);">Deleted items appear here for recovery.</p>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">Settings</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Security, access, sessions and system health.</p>
+                    </div>
+                </div>
+                <div class="settings-grid">
+                    <div class="settings-card">
+                        <h3>Admin Password</h3>
+                        <p>Stored as Argon2id hash. Takes effect immediately.</p>
+                        <div class="form-group"><label class="form-label">Current password</label><input type="password" id="set-cur-pass" class="form-input" autocomplete="current-password"></div>
+                        <div class="form-group"><label class="form-label">New password (min 8 chars)</label><input type="password" id="set-new-pass" class="form-input" autocomplete="new-password"></div>
+                        <button class="btn btn-primary" id="password-update-btn" onclick="changeAdminPassword()">Update Password</button>
+                    </div>
+                    <div class="settings-card">
+                        <h3>API Tokens</h3>
+                        <p>Machine keys for scripts. Shown once at creation.</p>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;"><input type="text" id="new-token-name" class="form-input" placeholder="Token name"><button class="btn btn-primary" id="token-create-btn" onclick="createApiToken()">Create</button></div>
+                        <div id="new-token-secret" style="display: none; margin-bottom: 12px;"><label class="form-label">Copy now — never shown again</label><div style="display: flex; gap: 8px;"><input type="text" id="new-token-secret-input" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem;"><button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('new-token-secret-input').value)">Copy</button></div></div>
+                        <div id="tokens-list"></div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>Active Sessions</h3>
+                        <p>Signed-in browsers. Revoke anything unfamiliar.</p>
+                        <div id="sessions-list"></div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>System Health</h3>
+                        <p>Runtime vitals of this tDocs instance.</p>
+                        <div id="health-box"></div>
+                        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="loadSettings()">Refresh</button>
+                    </div>
+                    <div class="settings-card" style="grid-column: 1 / -1;">
+                        <h3>Audit Log</h3>
+                        <p>Security-relevant actions (logins, uploads, deletes, shares, restores).</p>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <select id="audit-filter" class="form-input" style="max-width: 200px;" onchange="loadAuditLog()"><option value="">All actions</option><option value="login">login</option><option value="upload_complete">upload_complete</option><option value="share_create">share_create</option><option value="sync_manual">sync_manual</option><option value="snapshot_create">snapshot_create</option><option value="password_change">password_change</option></select>
+                            <button class="btn btn-secondary" onclick="loadAuditLog()">Refresh</button>
+                        </div>
+                        <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+                            <table class="data-table"><thead><tr><th style="width: 170px;">Time</th><th style="width: 160px;">Action</th><th>Detail</th><th style="width: 130px;">IP</th></tr></thead><tbody id="audit-body"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Telegram Setup Wizard Modal -->
+    <div id="tg-wizard-modal" class="modal-overlay">
+        <div class="modal-dialog" style="max-width: 520px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 14px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: #fff;">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 15L22 2Z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="modal-title">Connect Telegram</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">Pair tDocs with your Telegram account in three quick steps.</p>
+                    </div>
+                </div>
+                <button class="btn-icon" onclick="closeTelegramWizard()" title="Close">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Wizard stepper -->
+            <div class="wizard-stepper">
+                <div class="wizard-step" data-step="phone">
+                    <span class="wizard-step-num">1</span>
+                    <span class="wizard-step-label">Phone</span>
+                </div>
+                <div class="wizard-step-line"></div>
+                <div class="wizard-step" data-step="code">
+                    <span class="wizard-step-num">2</span>
+                    <span class="wizard-step-label">Verify code</span>
+                </div>
+                <div class="wizard-step-line"></div>
+                <div class="wizard-step" data-step="password">
+                    <span class="wizard-step-num">3</span>
+                    <span class="wizard-step-label">2FA (if any)</span>
+                </div>
+            </div>
+
+            <!-- Wizard body -->
+            <div class="wizard-body">
+                <!-- Phone step -->
+                <div class="wizard-pane" data-pane="phone">
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 14px;">
+                        Enter the phone number tied to the Telegram account you want to use as your storage vault. Use international format, e.g. <code>+62…</code>.
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label">Phone number</label>
+                        <input type="tel" id="tg-wiz-phone" class="form-input" placeholder="+1 555 123 4567" autocomplete="tel" autofocus>
+                    </div>
+                    <div id="tg-wiz-error" class="wizard-error" style="display: none;"></div>
+                </div>
+
+                <!-- Code step -->
+                <div class="wizard-pane" data-pane="code" style="display: none;">
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 14px;">
+                        A 5-digit verification code was sent to your Telegram app. Type it in below to continue.
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label">Verification code</label>
+                        <input type="text" id="tg-wiz-code" class="form-input" maxlength="8" placeholder="12345" inputmode="numeric" autocomplete="one-time-code">
+                    </div>
+                </div>
+
+                <!-- Password step -->
+                <div class="wizard-pane" data-pane="password" style="display: none;">
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 14px;">
+                        This account has two-factor authentication enabled. Enter your Telegram Cloud Password.
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label">2FA Cloud Password</label>
+                        <input type="password" id="tg-wiz-password" class="form-input" autocomplete="current-password">
+                    </div>
+                </div>
+
+                <!-- Done step -->
+                <div class="wizard-pane" data-pane="done" style="display: none;">
+                    <div class="wizard-success">
+                        <div class="wizard-success-icon" id="tg-wiz-done-icon">
+                            <svg class="icon icon-xl" viewBox="0 0 24 24" style="color: var(--success);"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <h4 id="tg-wiz-done-title" style="margin: 14px 0 6px; font-size: 1.05rem; font-weight: 800;">Telegram paired!</h4>
+                        <p id="tg-wiz-done-msg" style="color: var(--text-secondary); font-size: 0.88rem;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTelegramWizard()">Close</button>
+                <button class="btn btn-primary" id="tg-wiz-action" onclick="wizardAction()">
+                    <span id="tg-wiz-action-text">Send Code</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Upload Manager Drawer -->
+    <div id="upload-drawer" class="upload-drawer" style="display: none;">
+        <div class="upload-drawer-header" onclick="toggleUploadDrawer()">
+            <div class="upload-drawer-title">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span id="upload-drawer-title-text">Uploading...</span>
+            </div>
+            <div style="display: flex; gap: 4px;" onclick="event.stopPropagation()">
+                <button class="btn-icon" id="drawer-min-icon" onclick="toggleUploadDrawer()" title="Minimize"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+                <button class="btn-icon" onclick="closeUploadDrawer()" title="Close"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+        </div>
+        <div id="upload-drawer-items" class="upload-drawer-body"></div>
+    </div>
+
+    <!-- Persistent mini player. Two layouts in one DOM node:
+         · full  → seek bar, volume, speed (default)
+         · mp-min → compact glass pill: cover, marquee title, play/next,
+                    thin progress line, restore + close (state persisted) -->
+    <div id="mini-player" class="mini-player" style="display: none;">
+        <div class="mp-cover" id="mp-cover" onclick="MediaEngine.restore()" title="Restore player"></div>
+        <div class="mp-info" id="mp-info" role="button" tabindex="0" onclick="MediaEngine.restore()" title="Restore player">
+            <div class="mp-title" id="mp-title">—</div>
+            <div class="mp-sub" id="mp-sub">—</div>
+        </div>
+        <div class="mp-controls">
+            <button class="btn-icon mp-full-only" id="mp-shuffle" onclick="MediaEngine.toggleShuffle()" title="Shuffle"></button>
+            <button class="btn-icon mp-full-only" id="mp-prev" onclick="MediaEngine.prev()" title="Previous"></button>
+            <button class="btn-icon mp-play" id="mp-play" onclick="MediaEngine.toggle()" title="Play/Pause"></button>
+            <button class="btn-icon" id="mp-next" onclick="MediaEngine.next(true)" title="Next"></button>
+            <button class="btn-icon mp-full-only" id="mp-repeat" onclick="MediaEngine.cycleRepeat()" title="Repeat"></button>
+        </div>
+        <div class="mp-seek mp-full-only"><span id="mp-cur" class="mp-time">0:00</span><input type="range" id="mp-seekbar" min="0" max="1000" value="0" oninput="MediaEngine.seekTo(this.value / 10)"><span id="mp-dur" class="mp-time">0:00</span></div>
+        <div class="mp-extra">
+            <button class="btn-icon mp-full-only" onclick="MediaEngine.toggleMute()" id="mp-mute" title="Volume"></button>
+            <input class="mp-full-only" type="range" id="mp-vol" min="0" max="100" value="100" oninput="MediaEngine.setVolume(this.value)" title="Volume">
+            <select class="form-input mp-full-only" id="mp-speed" onchange="MediaEngine.setSpeed(parseFloat(this.value))" title="Playback speed" style="width: 76px; padding: 6px 8px; font-size: 0.75rem;"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+            <button class="btn-icon mp-min-only" id="mp-restore" onclick="MediaEngine.restore()" title="Restore player"></button>
+            <button class="btn-icon mp-full-only" id="mp-minimize" onclick="MediaEngine.minimize()" title="Minimize player"></button>
+            <button class="btn-icon mp-full-only" id="mp-expand" onclick="MediaEngine.expand()" title="Open file"></button>
+            <button class="btn-icon" id="mp-close" onclick="MediaEngine.close()" title="Close player"></button>
+        </div>
+        <!-- Compact progress line, visible only in the minimized pill. -->
+        <div class="mp-progress mp-min-only" id="mp-progress" aria-hidden="true"><span id="mp-progress-fill"></span></div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="ctx-menu" class="dropdown-menu ctx-menu" style="display: none;"></div>
+
+    <!-- File Details Drawer -->
+    <div id="details-drawer" class="details-drawer" style="display: none;">
+        <div class="details-drawer-header">
+            <div style="min-width: 0;"><div id="details-title" class="preview-title"></div><div id="details-sub" class="preview-meta"></div></div>
+            <button class="btn-icon" onclick="closeDetailsDrawer()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div id="details-body" class="details-drawer-body"></div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="preview-modal" class="modal-overlay">
+        <div class="modal-dialog modal-preview">
+            <div class="modal-header">
+                <div><h3 id="preview-title" class="modal-title"></h3><p id="preview-meta" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 3px;"></p></div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-secondary" id="preview-share-btn" style="padding: 7px 14px; font-size: 0.82rem;"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
+                    <button class="btn btn-secondary" id="preview-download-btn" style="padding: 7px 14px; font-size: 0.82rem;"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                    <button class="btn-icon" onclick="closePreview()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+            </div>
+            <div id="preview-content" class="preview-container"></div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Create Public Share Link</span></h3>
+                <button class="btn-icon" onclick="closeShareModal()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+            <p id="share-file-name" style="color: var(--text-secondary); font-size: 0.88rem; word-break: break-all;"></p>
+            <div class="form-group"><label class="form-label">Password Protection (Optional)</label><input type="password" id="share-password" class="form-input" placeholder="Leave empty for public access"></div>
+            <div class="form-group"><label class="form-label">Link Expiration</label><select id="share-expiry" class="form-input" style="cursor: pointer;"><option value="0">Never expires</option><option value="1">1 day</option><option value="7" selected>7 days</option><option value="30">30 days</option></select></div>
+            <div class="form-group"><label class="form-label">Download Limit (0 = unlimited)</label><input type="number" id="share-maxdl" class="form-input" min="0" max="1000000" value="0" placeholder="0"></div>
+            <div class="form-group"><label style="display: flex; align-items: center; gap: 8px; font-size: 0.86rem; font-weight: 600; cursor: pointer;"><input type="checkbox" id="share-preview-only" class="select-check"> Preview-only link (no download)</label></div>
+            <button class="btn btn-primary" id="share-submit-btn" onclick="createShareLinkSubmit()" style="margin-top: 8px;">Generate Share Link</button>
+            <div id="share-result-box" style="display: none; margin-top: 10px;"><label class="form-label">Share URL</label><div style="display: flex; gap: 8px; margin-top: 4px;"><input type="text" id="share-link-input" class="form-input" readonly><button class="btn btn-secondary" onclick="copyShareLinkInput()"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>Copy</span></button></div></div>
+        </div>
+    </div>
+
+    <!-- QR Modal -->
+    <div id="qr-modal" class="modal-overlay">
+        <div class="modal-dialog" style="max-width: 380px; text-align: center;">
+            <div class="modal-header"><h3 id="qr-modal-title" class="modal-title">Scan QR Code</h3><button class="btn-icon" onclick="closeQrModal()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+            <div id="qr-container" style="padding: 16px 0;"></div>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">Scan with your mobile camera to open or download.</p>
+        </div>
+    </div>
+
+    <!-- Prompt Modal -->
+    <div id="prompt-modal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-header"><h3 id="prompt-title" class="modal-title"></h3><button class="btn-icon" onclick="closePromptDialog()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+            <div class="form-group"><label id="prompt-label" class="form-label"></label><input type="text" id="prompt-input" class="form-input" autocomplete="off"></div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closePromptDialog()">Cancel</button><button id="prompt-submit-btn" class="btn btn-primary">Submit</button></div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-header"><h3 id="confirm-title" class="modal-title" style="color: var(--danger);"></h3><button class="btn-icon" onclick="closeConfirmDialog()"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+            <p id="confirm-message" style="color: var(--text-secondary); font-size: 0.88rem;"></p>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeConfirmDialog()">Cancel</button><button id="confirm-action-btn" class="btn btn-danger">Confirm</button></div>
+        </div>
+    </div>
+
+    <!-- Restore Overlay -->
+    <div id="restore-overlay-modal" class="modal-overlay" style="z-index: 200;">
+        <div class="modal-dialog" style="max-width: 400px; text-align: center; padding: 34px 26px;">
+            <div id="restore-overlay-icon" style="color: var(--primary); margin-bottom: 16px;"><svg class="icon icon-xl" viewBox="0 0 24 24" style="animation: spin 1s linear infinite;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg></div>
+            <h3 id="restore-overlay-title" style="font-size: 1.15rem; font-weight: 800; margin-bottom: 8px;">Restoring Database...</h3>
+            <p id="restore-overlay-msg" style="font-size: 0.86rem; color: var(--text-secondary);">Please do not close this browser window.</p>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay" onclick="if(event.target===this) closeHelpModal()">
+        <div class="modal-dialog" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="color: var(--primary);"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+                    <div><h3 class="modal-title">Cara Kerja &amp; Panduan tDocs</h3><p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 3px;">Ringkasan cara kerja sistem penyimpanan awan Telegram</p></div>
+                </div>
+                <button class="btn-icon" onclick="closeHelpModal()" title="Close"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+                <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 16px;">
+                    <div style="font-size: 0.86rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;"><span>⚡ 1. Apa itu tDocs?</span></div>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 7px; line-height: 1.55;">tDocs menyulap akun Telegram Anda menjadi media penyimpanan awan tak terbatas. File dialirkan langsung (zero-spool) dari browser ke data center Telegram tanpa membebani hard disk server.</p>
+                </div>
+                <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 16px;">
+                    <div style="font-size: 0.86rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;"><span>📦 2. Kapasitas &amp; Batasan</span></div>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 7px; line-height: 1.55;">Reguler: hingga <strong>2.0 GB/file</strong>. Premium: hingga <strong>4.0 GB/file</strong>. Total kapasitas: <strong>Tanpa batas (Unlimited)</strong>.</p>
+                </div>
+                <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 16px;">
+                    <div style="font-size: 0.86rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;"><span>🛡️ 3. Safe Mode &amp; ToS</span></div>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 7px; line-height: 1.55;">Antrean upload sekuensial (1 transfer aktif), jeda koneksi adaptif, dan penanganan flood wait otomatis menjaga akun Anda tetap aman.</p>
+                </div>
+                <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 16px;">
+                    <div style="font-size: 0.86rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;"><span>💾 4. Brankas &amp; Pemulihan</span></div>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 7px; line-height: 1.55;">Struktur folder dapat dicadangkan dan dipulihkan kapan saja melalui menu <strong>Snapshots</strong>.</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; justify-content: space-between; align-items: center;">
+                <a href="https://github.com/robprian/tDocs/blob/main/docs/USER_GUIDE.md" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 0.82rem; text-decoration: none;">📖 Buka Panduan Lengkap</a>
+                <button class="btn btn-primary" onclick="closeHelpModal()">Mengerti</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=18"></script>
+</body>
+</html>

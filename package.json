@@ -1,0 +1,46 @@
+{
+  "name": "tdocs",
+  "version": "2.0.0",
+  "description": "High-Capacity Cloud Storage Powered by Telegram MTProto Infrastructure",
+  "main": "bin/tdocs.js",
+  "bin": {
+    "tdocs": "bin/tdocs.js"
+  },
+  "scripts": {
+    "setup": "node bin/tdocs.js setup",
+    "start": "node bin/tdocs.js start",
+    "server": "node bin/tdocs.js server",
+    "doctor": "node bin/tdocs.js doctor"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "cloud-storage",
+    "drive",
+    "mtproto",
+    "file-manager",
+    "cli",
+    "self-hosted",
+    "web-drive"
+  ],
+  "author": "Robby Aprianto (https://github.com/robprian)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robprian/tDocs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/robprian/tDocs/issues"
+  },
+  "homepage": "https://github.com/robprian/tDocs#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}
