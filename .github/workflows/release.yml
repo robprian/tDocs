@@ -245,12 +245,15 @@ jobs:
         run: |
           set -euo pipefail
           DEB="$(find dist -name 'tdocs_*_amd64.deb' | head -1)"
+          [ -n "$DEB" ] || { echo "no amd64 deb found"; exit 1; }
+          STAGE="$RUNNER_TEMP/smoke-deb"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+          cp "$DEB" "$STAGE/"
           echo "Testing $DEB"
-          docker run --rm -v "$PWD/dist:/pkg:ro" debian:stable-slim bash -c '
+          docker run --rm -v "$STAGE:/pkg:ro" debian:stable-slim bash -c '
             set -euo pipefail
+            PKG="$(echo /pkg/*.deb)"
             apt-get update -qq
-            apt-get install -y -qq /pkg/'"$(basename "$DEB")"' 2>/dev/null || \
-              (cd /pkg && apt-get install -y -qq "./$(basename '"$DEB"')")
+            apt-get install -y -qq "$PKG"
             # apt path for local deb:
             command -v tdocs
             tdocs version
@@ -271,10 +274,13 @@ jobs:
         run: |
           set -euo pipefail
           TAR="$(find dist -name 'tdocs_*_linux_amd64.tar.gz' | head -1)"
-          docker run --rm -v "$PWD/dist:/pkg:ro" debian:stable-slim bash -c '
+          [ -n "$TAR" ] || { echo "no amd64 tarball found"; exit 1; }
+          STAGE="$RUNNER_TEMP/smoke-tar"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+          cp "$TAR" "$STAGE/"
+          docker run --rm -v "$STAGE:/pkg:ro" debian:stable-slim bash -c '
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq curl ca-certificates
-            mkdir -p /work && tar -xzf /pkg/'"$(basename "$TAR")"' -C /work
+            mkdir -p /work && tar -xzf /pkg/*.tar.gz -C /work
             /work/tdocs/tdocs version
             /work/tdocs/tdocs --help >/dev/null
             export TDOCS_MODE=user TDOCS_DATA_DIR=/tmp/td TDOCS_CONFIG_DIR=/tmp/tc
@@ -330,10 +336,14 @@ jobs:
         run: |
           set -euo pipefail
           RPM="$(find dist -name 'tdocs_*_x86_64.rpm' | head -1)"
+          [ -n "$RPM" ] || { echo "no x86_64 rpm found"; exit 1; }
+          STAGE="$RUNNER_TEMP/smoke-rpm"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+          cp "$RPM" "$STAGE/"
           echo "Testing $RPM"
-          docker run --rm -v "$PWD/dist:/pkg:ro" rockylinux:9 bash -c '
+          docker run --rm -v "$STAGE:/pkg:ro" rockylinux:9 bash -c '
             set -euo pipefail
-            dnf install -y -q /pkg/'"$(basename "$RPM")"'
+            PKG="$(echo /pkg/*.rpm)"
+            dnf install -y -q "$PKG"
             command -v tdocs
             tdocs version
             tdocs --help >/dev/null
@@ -365,10 +375,14 @@ jobs:
         run: |
           set -euo pipefail
           RPM="$(find dist -name 'tdocs_*_x86_64.rpm' | head -1)"
-          docker run --rm -v "$PWD/dist:/pkg:ro" opensuse/leap:15.6 bash -c '
+          [ -n "$RPM" ] || { echo "no x86_64 rpm found"; exit 1; }
+          STAGE="$RUNNER_TEMP/smoke-suse"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+          cp "$RPM" "$STAGE/"
+          docker run --rm -v "$STAGE:/pkg:ro" opensuse/leap:15.6 bash -c '
             set -euo pipefail
+            PKG="$(echo /pkg/*.rpm)"
             zypper --non-interactive refresh
-            zypper --non-interactive install -y /pkg/'"$(basename "$RPM")"' || rpm -i /pkg/'"$(basename "$RPM")"'
+            zypper --non-interactive install -y "$PKG" || rpm -i "$PKG"
             command -v tdocs
             tdocs version
             tdocs --help >/dev/null
