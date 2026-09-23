@@ -223,6 +223,9 @@ const openAPISpec = `{
     },
     "/api/snapshots/upload-restore": {
       "post": { "summary": "Upload a snapshot file and restore it", "requestBody": { "content": { "multipart/form-data": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "restored" } } }
+    },
+    "/api/update/status": {
+      "get": { "summary": "Update check: current vs latest release + upgrade command (superuser only)", "parameters": [{ "name": "refresh", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "{current, latest, available, url, hint, install_kind, checked_at, checking}" }, "403": { "description": "superuser required" } } }
     }
   }
 }`

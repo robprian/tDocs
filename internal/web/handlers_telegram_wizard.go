@@ -29,10 +29,17 @@ func (s *Server) handleTelegramWizardStart(w http.ResponseWriter, r *http.Reques
 	if s.tg == nil {
 		// JSON (not plain-text http.Error): the dashboard parses the body
 		// and a non-JSON 503 used to surface as generic "Failed to start wizard".
+		configured := s.telegramConfigured()
+		hint := "Run `tdocs setup` on the server (API_ID + API_HASH from my.telegram.org), then run `tdocs login` and restart tdocs."
+		code := "telegram_not_configured"
+		if configured {
+			hint = "API credentials are stored, but the server started before `tdocs login` saved a session. Stop tdocs, run `sudo tdocs login` with the SAME TDOCS_SECRET_KEY / data dir as the service, then restart tdocs."
+			code = "telegram_session_missing"
+		}
 		jsonOut(w, http.StatusServiceUnavailable, map[string]any{
 			"error": "telegram client not initialized on server",
-			"code":  "telegram_not_configured",
-			"hint":  "Set API credentials first: run `tdocs setup` on the server (API_ID + API_HASH from my.telegram.org), then restart tdocs.",
+			"code":  code,
+			"hint":  hint,
 		})
 		return
 	}

@@ -4194,8 +4194,6 @@ const TgWizard = {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ phone })
                 });
-                // Read text first: error responses are not always JSON, and a
-                // failed res.json() consumes the body (hiding the real message).
                 const raw = await res.text().catch(() => "");
                 let data = {};
                 try {
@@ -4204,7 +4202,7 @@ const TgWizard = {
                     data = raw ? { error: raw } : {};
                 }
                 if (!res.ok || !data.id) {
-                    this._showError(data.error || data.message || ("Server returned HTTP " + res.status));
+                    this._showError(data.hint || data.error || data.message || ("Server returned HTTP " + res.status));
                     document.getElementById("tg-wiz-action-text").textContent = "Send Code";
                     if (btn) btn.disabled = false;
                     return;

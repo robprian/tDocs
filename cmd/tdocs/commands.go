@@ -83,25 +83,27 @@ func runLogin(cfg *app.Config) {
 
 	ctx := context.Background()
 	err := mgr.Run(ctx, func(runCtx context.Context) error {
-		return mgr.AuthenticateInteractive(runCtx, reader, cfg.DBPath)
+		if err := mgr.AuthenticateInteractive(runCtx, reader, cfg.DBPath); err != nil {
+			return err
+		}
+		// Sync inside the same MTProto session: gotd's Client.Run
+		// cannot be re-entered immediately after it closes (its
+		// internal context stays canceled), so a second mgr.Run would
+		// either hang or return "client already closed" and skip the
+		// catalog sync entirely — the hang you saw after
+		// "Using existing Storage Channel".
+		if res, syncErr := mgr.SyncAndRecord(runCtx, "login"); syncErr != nil {
+			fmt.Fprintf(os.Stderr, "  ○ Channel sync skipped: %v\n", syncErr)
+		} else {
+			fmt.Printf("  ✓ Channel sync: %d scanned, %d recovered, %d refreshed.\n", res.Scanned, res.Inserted, res.Updated)
+		}
+		return nil
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  ✕ Login failed: %v\n", err)
 		fmt.Fprintln(os.Stderr, "  Hint: wrong secret? Re-run with the original TDOCS_SECRET_KEY or `tdocs login --reset`.")
 		return
 	}
-
-	// Pull existing channel documents into the local catalog right away so a
-	// freshly paired (or reset) instance immediately sees prior uploads.
-	_ = mgr.Run(ctx, func(runCtx context.Context) error {
-		res, syncErr := mgr.SyncAndRecord(runCtx, "login")
-		if syncErr != nil {
-			fmt.Fprintf(os.Stderr, "  ○ Channel sync skipped: %v\n", syncErr)
-			return nil
-		}
-		fmt.Printf("  ✓ Channel sync: %d scanned, %d recovered, %d refreshed.\n", res.Scanned, res.Inserted, res.Updated)
-		return nil
-	})
 
 	fmt.Println("")
 	fmt.Println("  ╭──────────────────────────────────────────────╮")

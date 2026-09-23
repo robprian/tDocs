@@ -94,22 +94,22 @@ func CompareVersions(a, b string) int {
 	if pb == nil {
 		return 1
 	}
-	for i := 0; i < len(pa) && i < len(pb); i++ {
-		if pa[i] != pb[i] {
-			if pa[i] < pb[i] {
+	for i := 0; i < len(pa) || i < len(pb); i++ {
+		var a, b int
+		if i < len(pa) {
+			a = pa[i]
+		}
+		if i < len(pb) {
+			b = pb[i]
+		}
+		if a != b {
+			if a < b {
 				return -1
 			}
 			return 1
 		}
 	}
-	switch {
-	case len(pa) < len(pb):
-		return -1
-	case len(pa) > len(pb):
-		return 1
-	default:
-		return 0
-	}
+	return 0
 }
 
 func versionParts(v string) []int {
@@ -199,16 +199,18 @@ func ownedByRPM(path string) bool {
 	return exec.CommandContext(ctx, "rpm", "-qf", path).Run() == nil
 }
 
-// TarballName is the release artifact for a linux GOARCH (amd64/arm64 only;
-// other arches ship tarballs too but the self-updater covers the mainstream).
+// TarballName is the release artifact for a linux GOARCH. GOARCH arm ships
+// as armv7 (GOARM=7 build); every other key is the artifact suffix verbatim.
 func TarballName(version, goarch string) (string, bool) {
-	switch goarch {
-	case "amd64", "arm64":
-		return fmt.Sprintf("tdocs_%s_linux_%s.tar.gz",
-			strings.TrimPrefix(version, "v"), goarch), true
-	default:
+	arch, ok := map[string]string{
+		"amd64": "amd64", "arm64": "arm64", "arm": "armv7",
+		"386": "386", "ppc64le": "ppc64le", "s390x": "s390x",
+	}[goarch]
+	if !ok {
 		return "", false
 	}
+	return fmt.Sprintf("tdocs_%s_linux_%s.tar.gz",
+		strings.TrimPrefix(version, "v"), arch), true
 }
 
 // UpgradeHint returns the exact command a human should run for this install
@@ -217,15 +219,21 @@ func UpgradeHint(kind, version, goarch string) string {
 	ver := strings.TrimPrefix(version, "v")
 	switch kind {
 	case InstallDeb:
-		debArch := map[string]string{"amd64": "amd64", "arm64": "arm64"}[goarch]
-		if debArch == "" {
-			debArch = "amd64"
+		debArch, ok := map[string]string{
+			"amd64": "amd64", "arm64": "arm64", "386": "i386",
+			"arm": "armhf", "ppc64le": "ppc64el", "s390x": "s390x",
+		}[goarch]
+		if !ok {
+			return "tdocs update"
 		}
 		return fmt.Sprintf("sudo apt update && sudo apt install ./tdocs_%s_%s.deb", ver, debArch)
 	case InstallRPM:
-		rpmArch := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[goarch]
-		if rpmArch == "" {
-			rpmArch = "x86_64"
+		rpmArch, ok := map[string]string{
+			"amd64": "x86_64", "arm64": "aarch64", "386": "i686",
+			"arm": "armv7hl", "ppc64le": "ppc64le", "s390x": "s390x",
+		}[goarch]
+		if !ok {
+			return "tdocs update"
 		}
 		return fmt.Sprintf("sudo dnf upgrade ./tdocs_%s_%s.rpm", ver, rpmArch)
 	case InstallSource:

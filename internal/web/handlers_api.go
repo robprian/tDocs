@@ -83,12 +83,12 @@ func (s *Server) handleAPIIndex(w http.ResponseWriter, r *http.Request) {
 		{"GET", "/api/cdn/files?search=&mime=video/&limit=", "key", "CDN catalog for film sites -> {files:[{id,name,stream_url,download_url}],total}"},
 		{"GET", "/api/cdn/files/{id}", "key", "One CDN entry with embed URLs"},
 		{"GET", "/cdn/{id}/stream", "public*", "Embed <video>/<audio>/<img> (Range, CORS, ETag)"},
-		{"GET", "/cdn/{id}/download", "public*", "Public save-as download (CORS)"},
 		{"GET", "/api/snapshots", "key", "List Database Snapshots"},
 		{"POST", "/api/snapshots", "key", "Create + upload snapshot"},
 		{"POST", "/api/snapshots/{id}/restore", "key", "Point-in-Time Restore"},
 		{"GET", "/api/snapshots/{id}/download", "key", "Download snapshot .db.gz"},
 		{"DELETE", "/api/snapshots/{id}", "key", "Delete snapshot"},
+		{"GET", "/api/update/status", "superuser", "Update check: current vs latest release + upgrade command"},
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{

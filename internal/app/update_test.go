@@ -12,6 +12,8 @@ func TestCompareVersions(t *testing.T) {
 		{"v2.1.0", "v2.1.1", -1},
 		{"v2.1.1", "v2.1.0", 1},
 		{"v2.1.0", "v2.2.0", -1},
+		{"v2.1", "v2.1.0", 0},
+		{"v2.1.0", "v2.1", 0},
 		{"v2.10.0", "v2.9.9", 1},
 		{"v3.0.0", "v2.99.99", 1},
 		{"dev", "v2.1.0", -1},
@@ -48,6 +50,15 @@ func TestUpgradeHint(t *testing.T) {
 	if got := UpgradeHint(InstallRPM, "v2.1.1", "amd64"); got != "sudo dnf upgrade ./tdocs_2.1.1_x86_64.rpm" {
 		t.Errorf("rpm hint: %q", got)
 	}
+	if got := UpgradeHint(InstallDeb, "v2.1.1", "386"); got != "sudo apt update && sudo apt install ./tdocs_2.1.1_i386.deb" {
+		t.Errorf("deb 386 hint: %q", got)
+	}
+	if got := UpgradeHint(InstallRPM, "v2.1.1", "arm64"); got != "sudo dnf upgrade ./tdocs_2.1.1_aarch64.rpm" {
+		t.Errorf("rpm arm64 hint: %q", got)
+	}
+	if got := UpgradeHint(InstallDeb, "v2.1.1", "mips"); got != "tdocs update" {
+		t.Errorf("unknown arch must fall back to self-update, got %q", got)
+	}
 	if got := UpgradeHint(InstallTarball, "v2.1.1", "amd64"); got != "tdocs update" {
 		t.Errorf("tarball hint: %q", got)
 	}
@@ -60,8 +71,11 @@ func TestTarballName(t *testing.T) {
 	if name, ok := TarballName("v2.1.1", "amd64"); !ok || name != "tdocs_2.1.1_linux_amd64.tar.gz" {
 		t.Errorf("amd64 tarball: %q %v", name, ok)
 	}
-	if _, ok := TarballName("v2.1.1", "s390x"); ok {
-		t.Error("self-updater must not claim s390x tarball support")
+	if name, ok := TarballName("v2.1.1", "arm"); !ok || name != "tdocs_2.1.1_linux_armv7.tar.gz" {
+		t.Errorf("arm tarball must use armv7 suffix: %q %v", name, ok)
+	}
+	if _, ok := TarballName("v2.1.1", "mips"); ok {
+		t.Error("self-updater must not claim unsupported arch tarball support")
 	}
 }
 
