@@ -33,25 +33,40 @@ func TestEnv3Priority(t *testing.T) {
 func TestResolveDBPathPrefersNewestBrand(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
+	t.Setenv("TDOCS_DB_PATH", "")
+	t.Setenv("ROBDOCS_DB_PATH", "")
+	t.Setenv("TELEDRIVE_DB_PATH", "")
+	t.Setenv("TDOCS_MODE", "user")
+	t.Setenv("TDOCS_DATA_DIR", filepath.Join(dir, "prod-data"))
 
-	if got := resolveDBPath(); got != "tdocs.db" {
-		t.Fatalf("expected fresh default tdocs.db, got %q", got)
+	// Fresh production install: database lives under the data directory.
+	got := resolveDBPath(ResolvePaths())
+	want := filepath.Join(dir, "prod-data", "tdocs.db")
+	if got != want {
+		t.Fatalf("expected production default %q, got %q", want, got)
 	}
 
-	// Pre-rebrand robdocs.db is adopted when it is the only database present.
+	// Pre-rebrand robdocs.db in the CWD is adopted when it is the only database present.
 	if err := os.WriteFile(filepath.Join(dir, "robdocs.db"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := resolveDBPath(); got != "robdocs.db" {
+	if got := resolveDBPath(ResolvePaths()); got != "robdocs.db" {
 		t.Fatalf("expected robdocs.db fallback, got %q", got)
 	}
 
-	// tdocs.db wins as soon as it exists.
+	// tdocs.db in the CWD wins as soon as it exists.
 	if err := os.WriteFile(filepath.Join(dir, "tdocs.db"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := resolveDBPath(); got != "tdocs.db" {
+	if got := resolveDBPath(ResolvePaths()); got != "tdocs.db" {
 		t.Fatalf("expected tdocs.db to win, got %q", got)
+	}
+}
+
+func TestResolveDBPathEnvOverride(t *testing.T) {
+	t.Setenv("TDOCS_DB_PATH", "/tmp/custom.db")
+	if got := resolveDBPath(ResolvePaths()); got != "/tmp/custom.db" {
+		t.Fatalf("env override ignored: %q", got)
 	}
 }
 

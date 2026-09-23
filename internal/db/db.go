@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -124,7 +125,18 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 );
 `
 
+// SchemaVersion is the schema level this binary understands. It is stored in
+// SQLite's PRAGMA user_version so future upgrades can refuse to open a
+// database written by a newer tDocs instead of silently corrupting it.
+//
+// Version history:
+//
+//	0  — databases created before versioning was introduced
+//	1  — baseline schema (folders/files/settings/...) + trash columns
+const SchemaVersion = 1
+
 // Open initializes the SQLite database with WAL journal mode and executes the schema.
+// Existing data is preserved: CREATE TABLE IF NOT EXISTS + additive ALTER only.
 func Open(path string) (*DB, error) {
 	// ponytail: SQLite with WAL mode and 5s busy timeout handles concurrent readers
 	// and serialized writes cleanly without external database servers.
@@ -138,6 +150,15 @@ func Open(path string) (*DB, error) {
 	sdb.SetMaxOpenConns(10)
 	sdb.SetMaxIdleConns(5)
 	sdb.SetConnMaxLifetime(time.Hour)
+
+	// Fail safely when the on-disk schema was written by a newer release.
+	var userVersion int
+	if err := sdb.QueryRow("PRAGMA user_version").Scan(&userVersion); err == nil && userVersion > SchemaVersion {
+		_ = sdb.Close()
+		return nil, fmt.Errorf(
+			"database schema version %d is newer than this build supports (%d); upgrade tDocs or restore a compatible backup",
+			userVersion, SchemaVersion)
+	}
 
 	if _, err := sdb.Exec(schema); err != nil {
 		_ = sdb.Close()
@@ -159,7 +180,31 @@ func Open(path string) (*DB, error) {
 		}
 	}
 
+	// Stamp the supported version after successful migration. PRAGMA does not
+	// accept bound parameters, so the constant is interpolated safely.
+	if userVersion < SchemaVersion {
+		if _, err := sdb.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
+			_ = sdb.Close()
+			return nil, fmt.Errorf("stamp schema version: %w", err)
+		}
+	}
+
+	// Production databases hold Telegram sessions and password hashes —
+	// never leave them group/world readable. Best-effort (Windows ignores).
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if fi, err := os.Stat(p); err == nil && fi.Mode().Perm()&0o077 != 0 {
+			_ = os.Chmod(p, 0o600)
+		}
+	}
+
 	return &DB{DB: sdb}, nil
+}
+
+// SchemaVersion reports the PRAGMA user_version currently stored in the database.
+func (d *DB) SchemaVersion() (int, error) {
+	var v int
+	err := d.QueryRow("PRAGMA user_version").Scan(&v)
+	return v, err
 }
 
 // GetSetting retrieves a setting value by key.

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Test & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then
+            echo "Files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: CGO_ENABLED=0 go vet ./...
+
+      - name: go test
+        run: CGO_ENABLED=0 go test ./...
+
+      - name: Build static binary (linux/amd64)
+        run: |
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/tdocs ./cmd/tdocs
+          file dist/tdocs
+          # Must be statically linked (pure Go stack: modernc sqlite + gotd).
+          if ldd dist/tdocs 2>&1 | grep -qv "not a dynamic executable"; then
+            echo "Binary is dynamically linked — expected static"
+            ldd dist/tdocs || true
+            exit 1
+          fi
+
+      - name: Smoke test binary
+        run: |
+          ./dist/tdocs version
+          ./dist/tdocs --help
+          export TDOCS_MODE=user
+          export TDOCS_DATA_DIR="$RUNNER_TEMP/tdocs-data"
+          export TDOCS_CONFIG_DIR="$RUNNER_TEMP/tdocs-cfg"
+          ./dist/tdocs doctor || true
+          ./dist/tdocs migrate
+          ./dist/tdocs status
+
+      - name: Frontend syntax (embedded app.js)
+        run: |
+          node --check internal/web/static/app.js
+          node --check bin/tdocs.js
+
+  build-matrix:
+    name: Cross-build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64,  goarm: "" }
+          - { goos: linux, goarch: arm64,  goarm: "" }
+          - { goos: linux, goarch: arm,    goarm: "7" }
+          - { goos: linux, goarch: 386,    goarm: "" }
+          - { goos: linux, goarch: ppc64le, goarm: "" }
+          - { goos: linux, goarch: s390x,  goarm: "" }
+          - { goos: darwin, goarch: amd64, goarm: "" }
+          - { goos: darwin, goarch: arm64, goarm: "" }
+          - { goos: windows, goarch: amd64, goarm: "" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          out="tdocs"
+          if [ "$GOOS" = "windows" ]; then out="tdocs.exe"; fi
+          go build -trimpath -ldflags="-s -w" -o "$out" ./cmd/tdocs
+          ls -la "$out"

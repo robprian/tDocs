@@ -9,16 +9,22 @@
 tdocs.log
 *.log
 
-# Build artifacts
-tdocs
-tdocs.exe
-bin/
+# Build artifacts — only the root binary and packaged output, never sources.
+# NOTE: do NOT use a bare `tdocs` pattern — that also ignores cmd/tdocs/.
+/tdocs
+/tdocs.exe
+/bin/tdocs
+/bin/tdocs.exe
 dist/
+
+# Brand assets embedded in the UI must ship with the source (CI builds them).
+references.png
+*.png
+!docs/screenshots/*.png
+!internal/web/static/*.png
 
 # Agent scratch & QA captures
 .scratch/
-*.png
-!docs/screenshots/*.png
 
 # OS / editor
 .DS_Store

@@ -2,220 +2,325 @@
 
 # ⚡ tDocs
 
-**Cloud storage pribadi bertenaga Telegram MTProto — single binary, console dashboard, API siap embed.**
+**Cloud storage pribadi bertenaga Telegram MTProto — single binary, dashboard web, API siap embed.**
 
-[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Pure Go](https://img.shields.io/badge/CGO-Zero%20(Pure%20Go)-orange)](https://modernc.org/sqlite)
+[![Release](https://img.shields.io/github/v/release/robprian/tDocs)](https://github.com/robprian/tDocs/releases)
 
 </div>
 
-> **English:** tDocs turns your Telegram account into a secure personal cloud drive: dark-first console dashboard with storage analytics, resumable uploads, HTTP 206 streaming, share links, trash + versions, automated snapshots, and a public CDN + OpenAPI for embedding files (e.g. a film site) anywhere.
+> **English:** tDocs turns your Telegram account into a secure personal cloud drive: dark-first dashboard with storage analytics, resumable uploads, HTTP 206 streaming, share links, trash + versions, automated snapshots, and a public CDN + OpenAPI for embedding files anywhere.
+>
+> **You do not need Go, Node.js, npm, or a Git clone to run tDocs.** Download a package, install it, run `tdocs`.
 
-## 📸 Tampilan
+---
 
-![Login](docs/screenshots/login.png)
-![Dashboard](docs/screenshots/dashboard.png)
-![Telegram pairing wizard](docs/screenshots/telegram-wizard.png)
+## ⬇️ Download tDocs
 
+Grab the latest release: **[github.com/robprian/tDocs/releases](https://github.com/robprian/tDocs/releases)**
 
-## ✨ Fitur
+| Your system | Download |
+| :--- | :--- |
+| **Debian / Ubuntu / Mint / Pop!_OS** | `tdocs_<version>_amd64.deb` or `_arm64.deb` |
+| **RHEL / Rocky / Alma / CentOS Stream / Fedora** | `tdocs_<version>_x86_64.rpm` or `_aarch64.rpm` |
+| **openSUSE Leap / Tumbleweed / SUSE** | `tdocs_<version>_x86_64.rpm` (RPM format) |
+| **Any Linux (universal)** | `tdocs_<version>_linux_<arch>.tar.gz` |
 
-- **Dashboard Console** — dark-first professional layout (sidebar + main content, storage analytics inline), statistik, full-circle storage gauge, breakdown per tipe, **My Folders** cards, quick upload dropzone, recent files, duplicate detection, Grid/Table view + sorting, drag & drop, light/dark mode, video/audio/image/PDF/code preview. Responsif mobile/tablet/desktop.
-- **Media Center** — dedicated Music/Videos/Images library with persistent mini-player (audio queue, seek, volume, speed, repeat/shuffle, playlist), video player with PiP, fullscreen, subtitle support, and image gallery with navigation. **Mini-player bisa di-minimize** jadi pill kaca kompak (cover berputar saat playing, judul, play/next, garis progres, tombol restore/close) dan pilihannya tersimpan di `localStorage` — tetap terlihat saat berpindah tab. Playback latency diblokir dua cara: video dimuat `preload=metadata` + stream **di-resolve/ dipanaskan sebelum** tombol play ditekan, dan resolusi `msg_id → document` di-cache singkat sehingga request `Range` berurutan (seek/pause/resume) tidak lagi memanggil Telegram API tiap kali.
-- **Sidebar bisa dilipat & dibuka lagi** — handle collapse di desktop, tombol reopen yang benar-benar muncul setelah dilipat, dan preferensi tidak merusak drawer mobile (collapse hanya aktif ≥1200px).
-- **Status koneksi Telegram jujur** — badge hanya menulis **Connected** setelah probe jaringan nyata berhasil (cache 30 detik; tombol *Test Connection* selalu memaksa probe baru). State yang tampil: `NOT CONFIGURED`, `CONNECTING`, `AUTHENTICATION REQUIRED`, `CONNECTED`, `DISCONNECTED`, `ERROR`. Endpoint yang butuh storage mengembalikan `503 telegram_storage_unavailable` + state, bukan error 500 atau daftar kosong palsu.
-- **Telegram Setup Wizard (superuser)** — Settings → Telegram Storage, 7 langkah: penjelasan storage backend → kredensial (secret tidak pernah dikirim balik ke browser setelah disimpan) → autentikasi (OTP/2FA, sesi terenkripsi) → pilih Storage Channel + verifikasi izin → **Test Connection nyata** → Initial Sync (progress + retry item gagal) → ringkasan terverifikasi. Seluruh rute wizard/status/test hanya bisa diakses superuser di sisi server (`superuserOnly`), bukan sekadar disembunyikan di UI.
-- **Pairing Telegram 100% lewat web** — tidak perlu `tdocs login` dari terminal lagi: buka Settings → Telegram Storage, masukkan nomor HP, terima kode OTP dari Telegram, masukkan kodenya (+ password 2FA bila ada). Wizard mengirim kode sungguhan, menunggu input, dan melaporkan error apa adanya (mis. kode salah) — tidak pernah "done" palsu. Seluruh endpoint wizard superuser-only.
-- **Upload resumable** — 5 MB/chunk → 512 KB part MTProto, antrean + **pause/resume/retry**, hash SHA-256 per upload untuk deteksi duplikat, tanpa memenuhi disk server.
-- **Manajemen file** — bulk select + bulk action (trash/restore/purge/move/favorite), context menu (klik kanan), details drawer + **versioning otomatis** (upload nama sama mengarsipkan versi lama), favorites, **Trash** (restore/purge), filter tipe/ukuran, breadcrumbs.
-- **Share link aman** — token acak + password (Argon2id) + masa berlaku + **batas download**, ada QR buat handoff ke HP.
-- **Sync Center** — kesehatan backend Telegram, riwayat sync, recovery satu klik; katalog dibangun ulang otomatis dari channel saat start (tahan restart).
-- **Snapshot otomatis** — backup SQLite tiap 24 jam & saat shutdown, retensi 5 snapshot, restore point-in-time dari dashboard.
-- **CDN publik + API** — tiap file punya `stream_url`/`download_url` siap pasang di `<video>` (Range 206, ETag, CORS terbuka), katalog JSON, token API, signed URL download, Swagger di `/docs`.
-- **Keamanan nyata** — sesi acak httpOnly (+Secure saat TLS), CSRF token, rate limiting, security headers (CSP, anti-clickjacking), password Argon2id, API token hash, audit log, TLS opsional. Detail: [SECURITY.md](SECURITY.md).
-- **Safe Mode** — antrean upload sekuensial (1 koneksi), pacing adaptif, backoff `FLOOD_WAIT` otomatis, channel `tDocs Vault` privat. Session MTProto terenkripsi AES-256-GCM.
+Verify downloads with `SHA256SUMS` published on the same release page.
 
-## 🚀 Mulai (pilih 1 cara)
+**Tested on** (package install + `tdocs version` + server smoke test in CI containers):
 
-Butuh `API_ID` + `API_HASH` dari [my.telegram.org](https://my.telegram.org) → API development tools (sekali saja).
+- Ubuntu LTS (GitHub-hosted runner)
+- Debian stable (container)
+- Rocky Linux 9 (container)
+- openSUSE Leap 15.6 (container)
 
-**Cara 1 — paling gampang (Go):**
+Other distributions with a compatible glibc userspace may also work. The primary binary is **statically linked** (pure Go: `modernc.org/sqlite` + `gotd`) — no dynamic library dependencies and no compiler toolchain required at runtime.
+
+---
+
+## 📦 Install
+
+### Debian / Ubuntu
+
 ```bash
-make start
-# setup (wizard .env) → login (OTP) → browser terbuka → http://localhost:8080
+sudo apt install ./tdocs_2.1.0_amd64.deb
+sudo systemctl enable --now tdocs
 ```
 
-**Cara 2 — Docker:**
+### RHEL / Rocky / Alma / Fedora
+
+```bash
+sudo dnf install ./tdocs_2.1.0_x86_64.rpm
+sudo systemctl enable --now tdocs
+```
+
+### openSUSE / SUSE
+
+```bash
+sudo zypper install ./tdocs_2.1.0_x86_64.rpm
+# or: sudo rpm -i ./tdocs_2.1.0_x86_64.rpm
+```
+
+### Universal tarball
+
+```bash
+tar -xzf tdocs_2.1.0_linux_amd64.tar.gz
+cd tdocs
+sudo ./install.sh          # system install + systemd (or --user for per-user)
+```
+
+Without root, `./install.sh` installs to `~/.local/bin` with user-mode paths.
+
+### Docker (optional)
+
 ```bash
 cp .env.example .env   # isi TDOCS_TG_APP_ID + TDOCS_TG_APP_HASH
 docker compose up -d --build
-docker compose exec tdocs tdocs login   # pairing OTP, sekali saja
-# buka http://localhost:8080 (password: isi TDOCS_ADMIN_PASSWORD)
+docker compose exec tdocs tdocs login
+# buka http://localhost:8080
 ```
 
-Image runtime berbasis `alpine:3.21` (~76 MB) dan **tanpa `apk add` saat build**
-(CA bundle disalin dari stage build), jadi build tidak bergantung ke mirror paket.
-Kalau mirror Docker Hub / proxy sedang lambat, tambahkan `--network=host`:
-```bash
-docker build --network=host -t tdocs:2.0.0 .
-```
-Build context dijaga kecil lewat `.dockerignore` (binary lokal, `*.db`, `.env`,
-`*.key` tidak ikut terkirim ke daemon).
+---
 
-**Cara 3 — Node:**
+## 🚀 First run
+
 ```bash
-npm start    # sama dengan: npx tdocs start
+tdocs setup    # wizard: Telegram API_ID/HASH + password + port
+tdocs login    # pairing Telegram (OTP + 2FA) — sekali saja
+tdocs start    # buka browser → dashboard
 ```
 
-Manual bila perlu: `make build` → `./tdocs setup` → `./tdocs login` → `./tdocs server`.
-Cek masalah kapan saja: `./tdocs doctor`.
+Bare `tdocs` behaves like `tdocs start`: if the app is not configured yet, the setup wizard launches automatically.
 
-## 🛠️ Manajemen server (`manage.sh`)
+Needs `API_ID` + `API_HASH` from [my.telegram.org](https://my.telegram.org) → API development tools (once).
 
-Satu skrip untuk running, update, restart, status, dsb (jalan dari mana saja,
-env `TDOCS_*` selalu menang atas `.env`):
+**Dashboard:** http://localhost:8080  
+**Logs (service):** `sudo journalctl -u tdocs -f`  
+**Diagnostics:** `tdocs doctor` · `tdocs status` · `tdocs version`
+
+---
+
+## 🗂️ Where data lives
+
+| Mode | Config | Data (DB, key, session) |
+| :--- | :--- | :--- |
+| **User install** | `~/.config/tdocs/` | `~/.local/share/tdocs/` |
+| **System install** (package/service) | `/etc/tdocs/` | `/var/lib/tdocs/` |
+| **Source checkout (dev)** | `./.env` | `./tdocs.db` |
+
+Override anytime:
 
 ```bash
-./manage.sh start [foreground]  # background (log: tdocs.log), deteksi port aktual
-./manage.sh stop                # graceful, tunggu snapshot shutdown
-./manage.sh restart             # stop + start
-./manage.sh status              # PID/uptime, URL, Telegram, jumlah file
-./manage.sh logs [-f|N]         # tail log (default 100 baris)
-./manage.sh sync                # pulihkan katalog dari channel Telegram
-./manage.sh snapshot            # backup DB sekarang → Storage Channel
-./manage.sh open                # buka dashboard di browser
-./manage.sh update              # git pull (bila git) + rebuild, restart bila sedang jalan
-./manage.sh doctor|backup|sync|login|...   # teruskan ke binary tdocs
-./manage.sh service-install [--user]       # systemd auto-start saat boot
-./manage.sh service-remove [--user]
+TDOCS_CONFIG_DIR=/custom/config
+TDOCS_DATA_DIR=/custom/data
+TDOCS_DB_PATH=/custom/data/tdocs.db
 ```
 
-## 💻 CLI
+Precedence: **CLI/environment → production `.env` → defaults**.  
+Legacy `ROBDOCS_*` / `TELEDRIVE_*` variables and old databases (`robdocs.db`, `teledrive.db`) keep working.
+
+Directories are created `0700`; the database and `.tdocs.key` are `0600`. Production installs never write into `/usr/bin` or the extracted tarball folder.
+
+---
+
+## ⚙️ System service
+
+Packages ship `tdocs.service` (runs as dedicated user `tdocs`, hardened unit, graceful shutdown with final snapshot):
 
 ```bash
-./tdocs setup               # wizard .env sekali saja
-./tdocs start               # jalan pintas: setup → login → server + browser
-./tdocs doctor              # cek config/db/session/port
-./tdocs upload ./film.mp4 --folder <folder_id>
-./tdocs download <file_id> --output ./film.mp4
-./tdocs list
-./tdocs backup              # snapshot sekarang ke Telegram
-./tdocs restore             # pulihkan dari snapshot Telegram
-./tdocs login --reset       # pairing ulang (wajib setelah ganti secret)
-./tdocs logout              # hapus session tersimpan
-./tdocs passwd <new-password>  # ganti password dashboard (Argon2id)
-./tdocs passwd --clear         # hapus override → kembali ke TDOCS_ADMIN_PASSWORD
+sudo systemctl enable tdocs
+sudo systemctl start tdocs
+sudo systemctl status tdocs
+sudo systemctl restart tdocs
+sudo journalctl -u tdocs -f
 ```
 
-## 🎬 CDN + API buat website film
+From a tarball install:
 
 ```bash
-# Katalog (ganti ADMIN_PASS dengan password admin)
+tdocs service install          # system unit (root)
+tdocs service install --user   # per-user unit
+tdocs service remove
+```
+
+---
+
+## 🔧 Configuration
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `TDOCS_PORT` / `TDOCS_HOST` | `8080` / `0.0.0.0` | Dashboard bind |
+| `TDOCS_DB_PATH` | `<data>/tdocs.db` | SQLite path |
+| `TDOCS_CONFIG_DIR` | XDG / `/etc/tdocs` | Config directory (holds `.env`) |
+| `TDOCS_DATA_DIR` | XDG / `/var/lib/tdocs` | Data directory |
+| `TDOCS_ADMIN_PASSWORD` | `admin123` | Dashboard + Bearer API key |
+| `TDOCS_SECRET_KEY` | auto (`.tdocs.key`) | MTProto session encryption |
+| `TDOCS_TG_APP_ID` / `TDOCS_TG_APP_HASH` | *(wizard)* | From my.telegram.org |
+| `TDOCS_CDN_PUBLIC` / `TDOCS_CDN_BASE_URL` | `true` / host | Public CDN behaviour |
+| `TDOCS_TLS_CERT_FILE` / `TDOCS_TLS_KEY_FILE` | *(empty)* | Enable HTTPS |
+| `TDOCS_BACKUP_INTERVAL` | `24h` | Automatic snapshot interval |
+| `TDOCS_NO_BROWSER` | *(empty)* | Set `1` to skip opening a browser |
+
+Copy `.env.example` → config dir `.env` (mode `600`), or run `tdocs setup`.  
+**Never commit `.env`, `*.db`, sessions, or keys.**
+
+---
+
+## 🔄 Upgrade
+
+Upgrades never delete the database, Telegram session, shares, or settings.
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt install ./tdocs_<new>_amd64.deb
+sudo systemctl restart tdocs
+```
+
+**RPM**
+
+```bash
+sudo dnf upgrade ./tdocs_<new>_x86_64.rpm   # or yum / zypper / rpm -U
+sudo systemctl restart tdocs
+```
+
+**Tarball**
+
+```bash
+# replace binary, keep data
+sudo systemctl stop tdocs
+sudo install -m 755 ./tdocs-new /usr/bin/tdocs
+sudo systemctl start tdocs
+```
+
+**Built-in helper** (linux tarball artifacts + checksum verification):
+
+```bash
+tdocs update           # download latest release, verify SHA256, swap binary
+tdocs update --check   # report only
+```
+
+Apply schema migrations with `tdocs migrate` (also runs automatically on start). A database written by a **newer** tDocs fails safely with a clear error instead of corrupting data.
+
+---
+
+## 💾 Backup & restore
+
+```bash
+tdocs backup     # snapshot SQLite → Telegram Storage Channel
+tdocs restore    # point-in-time restore from latest snapshot
+```
+
+Also available from the dashboard (Snapshot History). Offline safety copy:
+
+```bash
+sudo cp /var/lib/tdocs/tdocs.db /safe/tdocs.db
+```
+
+---
+
+## 🖥️ CLI
+
+```bash
+tdocs                  # first-run / start (wizard if unconfigured)
+tdocs version          # version, commit, build date, go, platform
+tdocs setup            # configuration wizard
+tdocs start            # setup → login → server + browser
+tdocs server           # dashboard + API + CDN only
+tdocs doctor           # config/db/session/port/permissions report
+tdocs status           # paths, schema, HTTP, Telegram pairing
+tdocs login [--reset]  # Telegram pairing (OTP + 2FA)
+tdocs logout
+tdocs passwd <new>     # dashboard password (Argon2id)
+tdocs upload <file> [--folder <id>]
+tdocs download <id> [--output <path>]
+tdocs list
+tdocs backup
+tdocs restore
+tdocs migrate          # safe schema migrations
+tdocs service install|remove [--user]
+tdocs update [--check]
+tdocs uninstall [--purge]   # never deletes data without --purge + confirm
+```
+
+---
+
+## 🎬 CDN + API
+
+```bash
 curl -H "Authorization: Bearer ADMIN_PASS" \
   "http://localhost:8080/api/cdn/files?mime=video/&limit=100"
-# -> {"files":[{"id","name","size","mime_type","stream_url","download_url"}],"total":1}
 ```
 
 ```html
 <video controls preload="metadata" src="http://localhost:8080/cdn/<file_id>/stream"></video>
 ```
 
-| Endpoint | Auth | Kegunaan |
+| Endpoint | Auth | Purpose |
 | :--- | :--- | :--- |
-| `GET /api/cdn/files?search=&mime=video/&limit=` | Bearer/token/cookie | Katalog JSON + `stream_url` |
-| `GET /api/cdn/files/{id}` | sama | Detail 1 file + URL embed |
-| `GET /cdn/{id}/stream` | publik* | Embed `<video>/<audio>/<img>` (Range, HEAD, ETag) |
-| `GET /cdn/{id}/download` | publik* | Download `attachment` |
-| `POST /api/share` `{file_id, password?, expiry_days?, max_downloads?}` | cookie/Bearer | Buat share link → `{token, page_url, stream_url, download_url}` |
-| `POST /api/sync` | cookie/Bearer | Bangun ulang katalog file dari channel Telegram (pulih setelah DB hilang) |
-| `GET /api/sync/runs` | cookie/Bearer | Riwayat sync |
-| `GET /api/files`, `GET /api/files/{id}` | cookie/Bearer | List & detail file dashboard |
-| `GET /api/files/{id}/meta` | cookie/Bearer | File + favorite/versions/shares/duplicates |
-| `POST /api/files/{id}/ticket` | cookie/Bearer | URL download bertanda tangan + kedaluwarsa |
-| `POST /api/files/bulk` | cookie/Bearer | Bulk trash/restore/purge/move/favorite |
-| `GET /api/favorites`, `GET /api/duplicates`, `GET /api/stats` | cookie/Bearer | Favorit, duplikat SHA-256, analitik |
-| `GET /api/trash`, `POST /api/trash/restore`, `DELETE /api/trash/…`, `POST /api/trash/empty` | cookie/Bearer | Sampah: list/restore/purge |
-| `GET /api/files/{id}/versions` … | cookie/Bearer | List/restore/delete versi file |
-| `GET /api/audit` | cookie/Bearer | Audit log |
-| `GET/POST /api/tokens`, `DELETE /api/tokens/{id}` | cookie/Bearer | Kelola API token |
-| `GET /api/sessions`, `DELETE /api/sessions/{id}` | cookie/Bearer | Sesi web aktif |
-| `POST /api/settings/password` | cookie/Bearer | Ganti password admin (Argon2id) |
-| `GET /api/health`, `GET /api/status` | cookie/Bearer | Kesehatan runtime/server |
-| `GET /api/openapi.json`, `GET /docs` | — | Spesifikasi OpenAPI 3.0 + Swagger UI |
+| `GET /api/cdn/files?search=&mime=video/&limit=` | Bearer/token/cookie | Catalog + `stream_url` |
+| `GET /cdn/{id}/stream` | public* | `<video>/<audio>/<img>` (Range 206) |
+| `POST /api/share` | cookie/Bearer | Share link (password, expiry, limit) |
+| `GET /api/openapi.json`, `GET /docs` | — | OpenAPI 3.0 + Swagger UI |
 
-\*Set `TDOCS_CDN_PUBLIC=false` untuk mengunci `/cdn/*` di balik Bearer key. Set `TDOCS_CDN_BASE_URL=https://domain.mu` bila di-reverse-proxy agar URL di JSON memakai domain publik.
+\* `TDOCS_CDN_PUBLIC=false` locks `/cdn/*` behind the Bearer key.
 
-Bearer = `Authorization: Bearer <password admin | API token>` atau `?api_key=`. Mutasi via cookie wajib header `X-CSRF-Token` (diambil dari cookie `tdocs_csrf`).
+Full list: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 
-## ⚙️ Konfigurasi
+---
 
-| Variable | Default | Keterangan |
-| :--- | :--- | :--- |
-| `TDOCS_PORT` / `TDOCS_HOST` | `8080` / `0.0.0.0` | Bind dashboard |
-| `TDOCS_DB_PATH` | `tdocs.db` | File SQLite (`robdocs.db`/`teledrive.db` lama tetap dipakai bila ada) |
-| `TDOCS_ADMIN_PASSWORD` | `admin123` | Password dashboard + Bearer key API (bisa diganti via Settings → hash Argon2id di DB) |
-| `TDOCS_SECRET_KEY` | auto (`.tdocs.key`) | Enkripsi session + kunci HMAC tiket; ganti → wajib `login --reset` |
-| `TDOCS_TG_APP_ID` / `TDOCS_TG_APP_HASH` | *(wizard)* | Dari `my.telegram.org` (baca juga `.env`: `app_api_id`/`app_api_hash`) |
-| `TDOCS_CDN_PUBLIC` / `TDOCS_CDN_BASE_URL` | `true` / host request | Kontrol CDN publik & base URL katalog |
-| `TDOCS_TLS_CERT_FILE` / `TDOCS_TLS_KEY_FILE` | *(kosong)* | Aktifkan HTTPS bila keduanya diisi |
-| `TDOCS_BACKUP_INTERVAL` | `24h` | Interval snapshot otomatis (format durasi Go) |
-
-Semua variabel juga dibaca dengan prefix warisan `ROBDOCS_*` lalu `TELEDRIVE_*`.
-
-## 🔒 Model keamanan (ringkas)
-
-- Sesi dashboard = token acak 256-bit (httpOnly, SameSite=Lax, Secure saat TLS), disimpan server-side 30 hari; logout me-revoke. Cookie statis lama tidak berlaku lagi → login ulang sekali.
-- Mutasi via cookie wajib CSRF; klien Bearer/API-token bebas CSRF (tanpa ambient authority).
-- Password admin & share: Argon2id (bcrypt lama tetap terverifikasi). API token: acak 256-bit, hanya hash SHA-256 yang disimpan, tampil sekali.
-- Rate limit: login 15/menit/IP, API 600/menit/IP. Header aman: CSP, `frame-ancestors 'self'`, nosniff, referrer, permissions. HSTS saat TLS.
-- Download bisa memakai URL bertanda tangan HMAC + kedaluwarsa (`POST /api/files/{id}/ticket`).
-- Audit log untuk login, upload, hapus, share, snapshot, sync, token, password.
-- Jujur soal enkripsi: yang terenkripsi AES-256-GCM adalah **session/auth Telegram**; byte file mengandalkan transport + penyimpanan Telegram (tDocs tidak mengklaim E2E file). Kredensial API Telegram disimpan sebagai pengenal klien; kunci akses akun (session) terenkripsi.
-
-## 🔌 Status Telegram & Storage Adapter
-
-Semua fitur berbasis Telegram berjalan di balik abstraksi `internal/storage`
-(`Backend`), jadi S3/MinIO/local bisa ditambahkan tanpa menulis ulang aplikasi:
-
-```
-tDocs UI → API/Core → Storage Adapter → Telegram Storage
-```
-
-- `GET /api/telegram/state` — state terverifikasi terakhir (superuser).
-- `POST /api/telegram/test` — probe langsung: API reachable → auth valid → Storage Channel bisa diakses → izin baca/tulis.
-- Handler yang butuh storage memakai `requireTelegram`; bila belum siap, responsnya 503 + state, tidak pernah sukses palsu.
-- Tanpa kredensial Telegram, aplikasi masuk mode **"Telegram Storage — Not Configured"**; folder lokal, trash, favorit, share, preview, dan media player tetap berfungsi.
-- **UX anti-overflow**: header search turun ke baris kedua di ≤820px (bukan disembunyikan seperti versi lama); 7 lebar QA (1440→360px) nol horizontal overflow.
-- **XSS hardening**: nama file/folder dengan kutip (`O'Brien`, `<tag>`, `&`) dirender aman lewat helper `ja()` ganda-escape di semua inline handler; sudah diuji dengan login, search, preview, share, rename di semua breakpoint.
-
-## 🔑 Lupa password dashboard
-
-Login salah berkali-kali menampilkan halaman rate-limit yang jelas (bukan error
-mentah), dan password yang benar **tetap diterima** — limiter hanya memakan
-percobaan gagal. Kalau password benar-benar lupa, reset dari konsol server:
+## 🗑️ Uninstall
 
 ```bash
-./tdocs passwd 'password-baru-yang-kuat'   # set hash Argon2id baru
-./tdocs passwd --clear                     # hapus override → pakai TDOCS_ADMIN_PASSWORD
+# package
+sudo apt remove tdocs        # or dnf remove tdocs / zypper remove tdocs
+
+# tarball / any install — keeps data unless --purge
+tdocs uninstall
+tdocs uninstall --purge      # asks before deleting config + database + session
 ```
 
-Setelah reset, restart server agar daftar sesi ikut bersih: `./tdocs server`.
+**Data is never deleted silently.**
 
-## 🛠️ Masalah umum
+---
 
-- **`decrypt session: cipher: message authentication failed`** → secret berubah. Solusi: `./tdocs login --reset`, lalu restart server.
-- **Upload gagal semua** → biasanya MTProto belum login; cek log server, pairing ulang bila perlu.
-- **File hilang setelah restart / database kosong** → metadata dibangun ulang otomatis dari channel Telegram saat server mulai. Bisa juga dipicu manual dari **Sync Center** atau `POST /api/sync`.
-- **`403 CSRF token missing`** di script sendiri → kirim header `X-CSRF-Token` (cookie `tdocs_csrf`), atau pakai Bearer/API token.
+## 🛠️ Troubleshooting
 
-## 📚 Lanjutan
+| Symptom | Fix |
+| :--- | :--- |
+| `decrypt session: cipher: message authentication failed` | Secret changed → `tdocs login --reset`, restart |
+| Uploads fail | Not paired → `tdocs login` |
+| Empty file list after restore | Metadata rebuilds from the Storage Channel on start, or `POST /api/sync` |
+| Port already in use | Server auto-shifts +1…+50, or set `TDOCS_PORT` |
+| Service won't start | `sudo journalctl -u tdocs -e` · `tdocs doctor` |
+| Forgot dashboard password | `tdocs passwd 'new-password'` then `tdocs server` / restart service |
+| Check download integrity | Compare with `SHA256SUMS` on the release page |
 
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — cara kerja & panduan lengkap
-- [ARCHITECTURE.md](ARCHITECTURE.md) · [SECURITY.md](SECURITY.md) · [CONTEXT.md](CONTEXT.md) · [docs/adr/](docs/adr/)
+More: [SECURITY.md](SECURITY.md) · [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+
+---
+
+## 🛠️ Development
+
+Source builds, tests, and contribution workflow live in **[DEVELOPMENT.md](DEVELOPMENT.md)**.
+
+```bash
+make build && make test && make lint
+```
+
+---
+
+## 📚 Architecture
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design
+- [SECURITY.md](SECURITY.md) — security model
+- [CONTEXT.md](CONTEXT.md) — domain language
+- [docs/adr/](docs/adr/) — architecture decision records
 
 ---
 
 Dibuat oleh **Robby Aprianto** ([@robprian](https://github.com/robprian)) · [Source](https://github.com/robprian/tDocs) · [MIT](LICENSE)
 
-> Upgrade dari RobDocs/TeleDrive: variabel `ROBDOCS_*`/`TELEDRIVE_*`, `robdocs.db`/`teledrive.db`, `.robdocs.key`/`.teledrive.key`, cookie lama, channel `RobDocs Vault`/`TeleDrive Vault`, dan snapshot `robdocs-backup-*`/`teledrive-backup-*` tetap terbaca otomatis.
+> Upgrade dari RobDocs/TeleDrive: variabel `ROBDOCS_*`/`TELEDRIVE_*`, `robdocs.db`/`teledrive.db`, `.robdocs.key`/`.teledrive.key`, dan snapshot lama tetap terbaca otomatis.

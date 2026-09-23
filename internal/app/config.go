@@ -23,17 +23,31 @@ type Config struct {
 	CDNPublic        bool
 	TLSCertFile      string
 	TLSKeyFile       string
+	// Paths carries resolved config/data directories (dev/user/system).
+	Paths *Paths
 }
 
-// LoadConfig reads configuration from environment variables with safe defaults.
-// It first loads a local `.env` file (if present) without overriding real env vars,
-// then resolves the MTProto session secret via ResolveSecretKey semantics.
+// LoadConfig reads configuration with production precedence:
+//
+//	real environment variables
+//	    ↓
+//	.env in the process working directory (legacy / source tree)
+//	    ↓
+//	.env in the production config directory (TDOCS_CONFIG_DIR / XDG / /etc)
+//	    ↓
+//	built-in defaults
+//
+// Real environment variables always win because loadDotEnv never overrides
+// keys that are already set.
 func LoadConfig() *Config {
-	loadDotEnv(".env")
+	paths := ResolvePaths()
+	for _, f := range paths.EnvFiles() {
+		loadDotEnv(f)
+	}
 
 	host := env3("TDOCS_HOST", "ROBDOCS_HOST", "TELEDRIVE_HOST", "0.0.0.0")
 	port := env3("TDOCS_PORT", "ROBDOCS_PORT", "TELEDRIVE_PORT", "8080")
-	dbPath := resolveDBPath()
+	dbPath := resolveDBPath(paths)
 	adminPass := env3("TDOCS_ADMIN_PASSWORD", "ROBDOCS_ADMIN_PASSWORD", "TELEDRIVE_ADMIN_PASSWORD", "admin123")
 
 	appID, _ := strconv.Atoi(firstSet("TDOCS_TG_APP_ID", "ROBDOCS_TG_APP_ID", "TELEDRIVE_TG_APP_ID", "app_api_id", "0"))
@@ -53,12 +67,19 @@ func LoadConfig() *Config {
 		CDNPublic:        env3("TDOCS_CDN_PUBLIC", "ROBDOCS_CDN_PUBLIC", "TELEDRIVE_CDN_PUBLIC", "true") != "false",
 		TLSCertFile:      env3("TDOCS_TLS_CERT_FILE", "ROBDOCS_TLS_CERT_FILE", "TELEDRIVE_TLS_CERT_FILE", ""),
 		TLSKeyFile:       env3("TDOCS_TLS_KEY_FILE", "ROBDOCS_TLS_KEY_FILE", "TELEDRIVE_TLS_KEY_FILE", ""),
+		Paths:            paths,
 	}
 }
 
-// resolveDBPath defaults to tdocs.db but keeps using a pre-rebrand
-// robdocs.db / teledrive.db when that is the only database present.
-func resolveDBPath() string {
+// resolveDBPath picks the SQLite file location:
+//
+//  1. TDOCS_DB_PATH (or legacy ROBDOCS_/TELEDRIVE_ names) — always wins
+//  2. A pre-existing database in the working directory (tdocs.db, then the
+//     pre-rebrand robdocs.db / teledrive.db) — never abandons an existing
+//     install that was started from its data folder
+//  3. dev mode: ./tdocs.db (source-tree behaviour unchanged)
+//  4. production: <DataDir>/tdocs.db (~/.local/share/tdocs or /var/lib/tdocs)
+func resolveDBPath(paths *Paths) string {
 	if v := os.Getenv("TDOCS_DB_PATH"); v != "" {
 		return v
 	}
@@ -68,16 +89,19 @@ func resolveDBPath() string {
 	if v := os.Getenv("TELEDRIVE_DB_PATH"); v != "" {
 		return v
 	}
-	if _, err := os.Stat("tdocs.db"); err == nil {
+	for _, name := range []string{"tdocs.db", "robdocs.db", "teledrive.db"} {
+		if _, err := os.Stat(name); err == nil {
+			return name
+		}
+	}
+	if paths != nil && paths.Mode == "dev" {
 		return "tdocs.db"
 	}
-	if _, err := os.Stat("robdocs.db"); err == nil {
-		return "robdocs.db"
+	dataDir := "."
+	if paths != nil && paths.DataDir != "" {
+		dataDir = paths.DataDir
 	}
-	if _, err := os.Stat("teledrive.db"); err == nil {
-		return "teledrive.db"
-	}
-	return "tdocs.db"
+	return filepath.Join(dataDir, "tdocs.db")
 }
 
 // ResolveSecretKey implements the SECURITY.md key hierarchy without breaking

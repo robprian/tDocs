@@ -1,96 +1,445 @@
 name: Release
 
+# Tag-driven production release:
+#   git tag v2.1.0 && git push origin v2.1.0
+#
+# Pipeline: validate → build binaries (matrix) → packages (deb/rpm/tar)
+# → checksums → container smoke tests (Debian/Ubuntu/Rocky/openSUSE)
+# → GitHub Release with generated notes.
+
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 2.1.0) without leading v'
+        required: true
+        default: '0.0.0-dev'
 
 permissions:
   contents: write
 
+env:
+  GO_VERSION_FILE: go.mod
+
 jobs:
-  release:
-    name: Build & Publish Release
+  validate:
+    name: Validate source
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - name: go vet
+        run: CGO_ENABLED=0 go vet ./...
+      - name: go test
+        run: CGO_ENABLED=0 go test ./...
+
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      tag: ${{ steps.ver.outputs.tag }}
+      commit: ${{ steps.ver.outputs.commit }}
+      date: ${{ steps.ver.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          check-latest: true
-
-      - name: Build and Package All Platforms
+      - id: ver
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if [ -z "$TAG" ]; then
-            TAG="v1.0.1"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
           fi
-          echo "Building release for tag: $TAG"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-          mkdir -p bin dist
+  build:
+    name: Build ${{ matrix.goarch }}
+    needs: [validate, version]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goarch: amd64,   dir: amd64,   goarm: "" }
+          - { goarch: arm64,   dir: arm64,   goarm: "" }
+          - { goarch: arm,     dir: armv7,   goarm: "7" }
+          - { goarch: 386,     dir: 386,     goarm: "" }
+          - { goarch: ppc64le, dir: ppc64le, goarm: "" }
+          - { goarch: s390x,   dir: s390x,   goarm: "" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true
+      - name: Build static linux/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          COMMIT="${{ needs.version.outputs.commit }}"
+          DATE="${{ needs.version.outputs.date }}"
+          mkdir -p "dist/linux/${{ matrix.dir }}"
+          go build -trimpath \
+            -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${DATE}" \
+            -o "dist/linux/${{ matrix.dir }}/tdocs" \
+            ./cmd/tdocs
+          file "dist/linux/${{ matrix.dir }}/tdocs"
+          "dist/linux/${{ matrix.dir }}/tdocs" version | head -5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-linux-${{ matrix.dir }}
+          path: dist/linux/${{ matrix.dir }}/tdocs
+          if-no-files-found: error
 
-          # 1. Linux AMD64
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
-          tar -czvf "dist/tdocs-${TAG}-linux-amd64.tar.gz" -C bin tdocs
+  packages:
+    name: Package
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm fakeroot
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: binary-linux-*
+          merge-multiple: false
+      - name: Normalize artifact layout
+        run: |
+          # download-artifact puts each artifact in binary-linux-<dir>/
+          mkdir -p dist/linux
+          for d in dist/binary-linux-*; do
+            arch="${d#dist/binary-linux-}"
+            mkdir -p "dist/linux/$arch"
+            mv "$d/tdocs" "dist/linux/$arch/tdocs"
+            chmod +x "dist/linux/$arch/tdocs"
+            rm -rf "$d"
+          done
+          find dist -type f -ls
+      - name: Build tarballs
+        run: |
+          V="${{ needs.version.outputs.version }}"
+          for arch in amd64 arm64 armv7 386 ppc64le s390x; do
+            [ -f "dist/linux/$arch/tdocs" ] || continue
+            scripts/package-tar.sh "$V" "$arch"
+          done
+      - name: Build deb packages
+        run: |
+          V="${{ needs.version.outputs.version }}"
+          # Primary package architectures
+          scripts/package-deb.sh "$V" amd64
+          scripts/package-deb.sh "$V" arm64
+          # Additional where the binary exists
+          for ga in 386 arm ppc64le s390x; do
+            [ -f "dist/linux/$ga/tdocs" ] || continue
+            case "$ga" in arm) dir=armv7 ;; *) dir=$ga ;; esac
+            [ -f "dist/linux/$dir/tdocs" ] || continue
+            scripts/package-deb.sh "$V" "$ga" "dist/linux/$dir" || true
+          done
+      - name: Build rpm packages
+        run: |
+          V="${{ needs.version.outputs.version }}"
+          scripts/package-rpm.sh "$V" amd64
+          scripts/package-rpm.sh "$V" arm64
+      - name: Checksums
+        run: scripts/checksums.sh dist
+      - name: Release notes
+        run: |
+          V="${{ needs.version.outputs.version }}"
+          cat > dist/RELEASE_NOTES.md <<EOF
+          ## tDocs v${V}
 
-          # 2. Linux ARM64
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
-          tar -czvf "dist/tdocs-${TAG}-linux-arm64.tar.gz" -C bin tdocs
+          ### Highlights
+          - Production Linux packages: \`.deb\`, \`.rpm\`, universal \`.tar.gz\`
+          - Static self-contained binary (no Go, Node.js, or npm at runtime)
+          - First-run setup wizard, \`tdocs doctor\` / \`status\` / \`migrate\`
+          - systemd service with hardening (\`tdocs service install\`)
+          - Embedded dashboard — single executable
 
-          # 3. macOS Intel (AMD64)
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
-          tar -czvf "dist/tdocs-${TAG}-darwin-amd64.tar.gz" -C bin tdocs
+          ### Linux downloads
 
-          # 4. macOS Apple Silicon (ARM64)
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/tdocs ./cmd/tdocs
-          tar -czvf "dist/tdocs-${TAG}-darwin-arm64.tar.gz" -C bin tdocs
+          **Debian / Ubuntu**
+          - \`tdocs_${V}_amd64.deb\`
+          - \`tdocs_${V}_arm64.deb\`
 
-          # 5. Windows AMD64
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/tdocs.exe ./cmd/tdocs
-          tar -czvf "dist/tdocs-${TAG}-windows-amd64.tar.gz" -C bin tdocs.exe
-          (cd bin && zip -9 "../dist/tdocs-${TAG}-windows-amd64.zip" tdocs.exe)
+          **RHEL / Rocky / Alma / CentOS / Fedora / openSUSE**
+          - \`tdocs_${V}_x86_64.rpm\`
+          - \`tdocs_${V}_aarch64.rpm\`
 
-          # 6. SHA-256 Checksums
+          **Universal Linux**
+          - \`tdocs_${V}_linux_amd64.tar.gz\`
+          - \`tdocs_${V}_linux_arm64.tar.gz\`
+          - \`tdocs_${V}_linux_armv7.tar.gz\`
+          - \`tdocs_${V}_linux_386.tar.gz\`
+          - \`tdocs_${V}_linux_ppc64le.tar.gz\`
+          - \`tdocs_${V}_linux_s390x.tar.gz\`
+
+          **Checksums**
+          - \`SHA256SUMS\`
+
+          ### Quick install
+
+          \`\`\`bash
+          # Debian / Ubuntu
+          sudo apt install ./tdocs_${V}_amd64.deb
+          sudo systemctl enable --now tdocs
+
+          # RHEL family
+          sudo dnf install ./tdocs_${V}_x86_64.rpm
+          sudo systemctl enable --now tdocs
+
+          # Universal tarball
+          tar -xzf tdocs_${V}_linux_amd64.tar.gz
+          cd tdocs && sudo ./install.sh
+          \`\`\`
+
+          ### Upgrade
+          Install the new package over the old one — database and config are preserved.
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: |
+            dist/**/*.tar.gz
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/SHA256SUMS
+            dist/RELEASE_NOTES.md
+          if-no-files-found: error
+
+  smoke-debian:
+    name: Smoke Debian
+    needs: [packages, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: dist
+      - name: Test .deb in Debian stable container
+        run: |
+          set -euo pipefail
+          DEB="$(find dist -name 'tdocs_*_amd64.deb' | head -1)"
+          echo "Testing $DEB"
+          docker run --rm -v "$PWD/dist:/pkg:ro" debian:stable-slim bash -c '
+            set -euo pipefail
+            apt-get update -qq
+            apt-get install -y -qq /pkg/'"$(basename "$DEB")"' 2>/dev/null || \
+              (cd /pkg && apt-get install -y -qq "./$(basename '"$DEB"')")
+            # apt path for local deb:
+            command -v tdocs
+            tdocs version
+            tdocs --help >/dev/null
+            export TDOCS_MODE=user TDOCS_DATA_DIR=/tmp/td TDOCS_CONFIG_DIR=/tmp/tc
+            tdocs migrate
+            tdocs doctor || true
+            tdocs status
+            TDOCS_NO_BROWSER=1 TDOCS_PORT=8080 tdocs server &
+            pid=$!
+            sleep 3
+            curl -sf -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/login | grep -E "200|302|303"
+            kill -TERM $pid
+            wait $pid || true
+            echo "DEBIAN SMOKE OK"
+          '
+      - name: Test tarball in Debian
+        run: |
+          set -euo pipefail
+          TAR="$(find dist -name 'tdocs_*_linux_amd64.tar.gz' | head -1)"
+          docker run --rm -v "$PWD/dist:/pkg:ro" debian:stable-slim bash -c '
+            set -euo pipefail
+            apt-get update -qq && apt-get install -y -qq curl ca-certificates
+            mkdir -p /work && tar -xzf /pkg/'"$(basename "$TAR")"' -C /work
+            /work/tdocs/tdocs version
+            /work/tdocs/tdocs --help >/dev/null
+            export TDOCS_MODE=user TDOCS_DATA_DIR=/tmp/td TDOCS_CONFIG_DIR=/tmp/tc
+            /work/tdocs/tdocs migrate
+            TDOCS_NO_BROWSER=1 TDOCS_PORT=8080 /work/tdocs/tdocs server &
+            pid=$!
+            sleep 3
+            curl -sf -o /dev/null http://127.0.0.1:8080/login
+            kill -TERM $pid; wait $pid || true
+            echo "TARBALL SMOKE OK"
+          '
+
+  smoke-ubuntu:
+    name: Smoke Ubuntu LTS
+    needs: [packages, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: dist
+      - name: Test .deb on host (Ubuntu)
+        run: |
+          set -euo pipefail
+          DEB="$(find dist -name 'tdocs_*_amd64.deb' | head -1)"
+          sudo apt-get install -y "./$DEB"
+          command -v tdocs
+          tdocs version
+          tdocs --help >/dev/null
+          export TDOCS_MODE=user TDOCS_DATA_DIR="$RUNNER_TEMP/td" TDOCS_CONFIG_DIR="$RUNNER_TEMP/tc"
+          tdocs migrate
+          tdocs doctor || true
+          # systemd unit present from package
+          test -f /usr/lib/systemd/system/tdocs.service || test -f /lib/systemd/system/tdocs.service
+          TDOCS_NO_BROWSER=1 TDOCS_PORT=8081 tdocs server &
+          pid=$!
+          sleep 3
+          curl -sf -o /dev/null http://127.0.0.1:8081/login
+          kill -TERM $pid; wait $pid || true
+          sudo apt-get remove -y tdocs || true
+          echo "UBUNTU SMOKE OK"
+
+  smoke-rhel:
+    name: Smoke Rocky Linux
+    needs: [packages, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: dist
+      - name: Test .rpm in Rocky Linux container
+        run: |
+          set -euo pipefail
+          RPM="$(find dist -name 'tdocs_*_x86_64.rpm' | head -1)"
+          echo "Testing $RPM"
+          docker run --rm -v "$PWD/dist:/pkg:ro" rockylinux:9 bash -c '
+            set -euo pipefail
+            dnf install -y -q /pkg/'"$(basename "$RPM")"'
+            command -v tdocs
+            tdocs version
+            tdocs --help >/dev/null
+            export TDOCS_MODE=user TDOCS_DATA_DIR=/tmp/td TDOCS_CONFIG_DIR=/tmp/tc
+            tdocs migrate
+            tdocs doctor || true
+            test -f /usr/lib/systemd/system/tdocs.service || test -f /lib/systemd/system/tdocs.service
+            TDOCS_NO_BROWSER=1 TDOCS_PORT=8080 tdocs server &
+            pid=$!
+            sleep 3
+            curl -sf -o /dev/null http://127.0.0.1:8080/login || {
+              dnf install -y -q curl
+              curl -sf -o /dev/null http://127.0.0.1:8080/login
+            }
+            kill -TERM $pid; wait $pid || true
+            echo "ROCKY SMOKE OK"
+          '
+
+  smoke-suse:
+    name: Smoke openSUSE
+    needs: [packages, version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: dist
+      - name: Test .rpm on openSUSE Leap
+        run: |
+          set -euo pipefail
+          RPM="$(find dist -name 'tdocs_*_x86_64.rpm' | head -1)"
+          docker run --rm -v "$PWD/dist:/pkg:ro" opensuse/leap:15.6 bash -c '
+            set -euo pipefail
+            zypper --non-interactive refresh
+            zypper --non-interactive install -y /pkg/'"$(basename "$RPM")"' || rpm -i /pkg/'"$(basename "$RPM")"'
+            command -v tdocs
+            tdocs version
+            tdocs --help >/dev/null
+            export TDOCS_MODE=user TDOCS_DATA_DIR=/tmp/td TDOCS_CONFIG_DIR=/tmp/tc
+            tdocs migrate
+            echo "OPENSUSE SMOKE OK"
+          '
+
+  release:
+    name: Publish GitHub Release
+    needs: [version, packages, smoke-debian, smoke-ubuntu, smoke-rhel, smoke-suse]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: dist
+      - name: Flatten artifacts into dist root
+        run: |
+          find dist -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' -o -name 'SHA256SUMS' -o -name 'RELEASE_NOTES.md' \) -exec mv {} dist/ \;
+          find dist -mindepth 1 -type d -empty -delete 2>/dev/null || true
+          ls -la dist/
+          # Regenerate flat SHA256SUMS at dist root
           cd dist
-          sha256sum tdocs-* > sha256sums.txt
-          cat sha256sums.txt
-
+          rm -f SHA256SUMS
+          sha256sum tdocs_*.tar.gz tdocs_*.deb tdocs_*.rpm 2>/dev/null | sort -k2 > SHA256SUMS || true
+          cat SHA256SUMS
+      - name: Optional signing (cosign keyless) — best effort
+        if: ${{ vars.ENABLE_COSIGN == 'true' }}
+        uses: sigstore/cosign-installer@v3
+        continue-on-error: true
+      - name: Sign SHA256SUMS with cosign (optional)
+        if: ${{ vars.ENABLE_COSIGN == 'true' }}
+        continue-on-error: true
+        run: |
+          if command -v cosign >/dev/null 2>&1; then
+            cosign sign-blob --yes dist/SHA256SUMS -o dist/SHA256SUMS.sig || true
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
-          tag_name: ${{ github.ref_name }}
-          name: tDocs ${{ github.ref_name }}
-          generate_release_notes: true
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: tDocs ${{ needs.version.outputs.tag }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/tdocs_*.tar.gz
+            dist/tdocs_*.deb
+            dist/tdocs_*.rpm
+            dist/SHA256SUMS
+            dist/SHA256SUMS.sig
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Node.js for npm publish
-        if: env.NPM_TOKEN != ''
-        uses: actions/setup-node@v4
+  npm:
+    name: Publish npm wrapper (optional)
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && env.NPM_TOKEN != ''
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish package to npm
-        if: env.NPM_TOKEN != ''
+      - name: Publish
         run: |
           TAG_VER="${GITHUB_REF_NAME#v}"
           npm version "${TAG_VER}" --no-git-tag-version --allow-same-version
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
