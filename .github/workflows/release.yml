@@ -118,6 +118,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Ensure packaging scripts are executable
         run: chmod +x scripts/*.sh
+      - name: Set up QEMU (aarch64 rpm cross-build via docker fallback)
+        uses: docker/setup-qemu-action@v3
       - name: Install packaging tools
         run: |
           sudo apt-get update
