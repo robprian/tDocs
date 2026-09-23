@@ -70,6 +70,24 @@ func TestResolveDBPathEnvOverride(t *testing.T) {
 	}
 }
 
+func TestResolveDBPathHonorsExplicitDataDirInDev(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("TDOCS_DB_PATH", "")
+	t.Setenv("ROBDOCS_DB_PATH", "")
+	t.Setenv("TELEDRIVE_DB_PATH", "")
+	t.Setenv("TDOCS_MODE", "dev")
+	t.Setenv("TDOCS_DATA_DIR", filepath.Join(dir, "explicit-data"))
+
+	// No legacy database in CWD and an explicit data dir: the explicit dir
+	// must win even in dev mode (regression: dev used to force ./tdocs.db).
+	got := resolveDBPath(ResolvePaths())
+	want := filepath.Join(dir, "explicit-data", "tdocs.db")
+	if got != want {
+		t.Fatalf("expected explicit data dir %q, got %q", want, got)
+	}
+}
+
 func TestKeyFilePathsOrder(t *testing.T) {
 	paths := keyFilePaths("tdocs.db")
 	want := []string{".tdocs.key", ".robdocs.key", ".teledrive.key"}

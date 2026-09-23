@@ -94,7 +94,10 @@ func resolveDBPath(paths *Paths) string {
 			return name
 		}
 	}
-	if paths != nil && paths.Mode == "dev" {
+	// Dev-tree convenience (database next to the checkout) applies only when
+	// no explicit data dir was given — an explicit TDOCS_DATA_DIR must win,
+	// otherwise CLI commands silently use a different database than configured.
+	if paths != nil && paths.Mode == "dev" && (paths.DataDir == "" || paths.DataDir == ".") {
 		return "tdocs.db"
 	}
 	dataDir := "."

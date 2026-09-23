@@ -316,6 +316,13 @@ func runDoctor(cfg *app.Config) {
 				} else {
 					ok(fmt.Sprintf("data dir permissions %#o", perm))
 				}
+				if !writableDir(cfg.Paths.DataDir) {
+					hint := "jalankan sebagai pemilik data dir"
+					if os.Geteuid() != 0 && isSystemPath(cfg.DBPath) {
+						hint = "sudo -u tdocs tdocs <perintah>  atau  sudo tdocs <perintah>"
+					}
+					warn(fmt.Sprintf("data dir tidak bisa ditulis oleh %s%s", currentUsername(), ownerSuffix(fi)), hint)
+				}
 			}
 		}
 		if fi, err := os.Stat(cfg.DBPath); err == nil {

@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
+	"syscall"
 
 	"tdocs/internal/app"
 	"tdocs/internal/db"
@@ -141,8 +145,75 @@ func openDatabase(cfg *app.Config) *db.DB {
 	}
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "  Error opening database at %s: %v\n", cfg.DBPath, err)
+		printDatabaseError(cfg, err)
 		os.Exit(1)
 	}
 	return database
+}
+
+// printDatabaseError turns a bare sqlite open failure (e.g. system data dir
+// not writable by the current user) into an actionable message instead of a
+// cryptic "unable to open database file (14)".
+func printDatabaseError(cfg *app.Config, err error) {
+	fmt.Fprintf(os.Stderr, "  Error opening database at %s: %v\n", cfg.DBPath, err)
+
+	me := currentUsername()
+	dataDir := ""
+	if cfg.Paths != nil {
+		dataDir = cfg.Paths.DataDir
+	}
+	if dataDir == "" {
+		dataDir = filepath.Dir(cfg.DBPath)
+	}
+	if fi, statErr := os.Stat(dataDir); statErr != nil {
+		fmt.Fprintf(os.Stderr, "  Data dir %s tidak ada / tidak bisa dibuat: %v\n", dataDir, statErr)
+	} else if !writableDir(dataDir) {
+		fmt.Fprintf(os.Stderr, "  Data dir %s tidak bisa ditulis oleh %s%s.\n",
+			dataDir, me, ownerSuffix(fi))
+	}
+	if os.Geteuid() != 0 && isSystemPath(cfg.DBPath) {
+		fmt.Fprintln(os.Stderr, "  Ini system install — jalankan sebagai service user atau root:")
+		fmt.Fprintln(os.Stderr, "    sudo -u tdocs tdocs <perintah>   # disarankan")
+		fmt.Fprintln(os.Stderr, "    sudo tdocs <perintah>")
+		fmt.Fprintln(os.Stderr, "  Atau pakai data dir milik sendiri (database terpisah!):")
+		fmt.Fprintln(os.Stderr, "    TDOCS_DATA_DIR=~/.local/share/tdocs tdocs <perintah>")
+	}
+}
+
+func currentUsername() string {
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		return u.Username
+	}
+	return fmt.Sprintf("uid %d", os.Geteuid())
+}
+
+func ownerSuffix(fi os.FileInfo) string {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return ""
+	}
+	if u, err := user.LookupId(fmt.Sprint(st.Uid)); err == nil {
+		return fmt.Sprintf(" (milik %s, mode %#o)", u.Username, fi.Mode().Perm())
+	}
+	return fmt.Sprintf(" (milik uid %d, mode %#o)", st.Uid, fi.Mode().Perm())
+}
+
+func isSystemPath(p string) bool {
+	return strings.HasPrefix(p, "/var/lib/") ||
+		strings.HasPrefix(p, "/etc/") ||
+		strings.HasPrefix(p, "/usr/") ||
+		strings.HasPrefix(p, "/var/")
+}
+
+// writableDir probes write access without leaving anything behind.
+func writableDir(dir string) bool {
+	f, err := os.OpenFile(filepath.Join(dir, ".tdocs-writetest"),
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	_ = f.Close()
+	_ = os.Remove(name)
+	return true
 }

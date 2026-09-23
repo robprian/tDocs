@@ -295,7 +295,7 @@ tdocs uninstall --purge      # asks before deleting config + database + session
 | Empty file list after restore | Metadata rebuilds from the Storage Channel on start, or `POST /api/sync` |
 | Port already in use | Server auto-shifts +1…+50, or set `TDOCS_PORT` |
 | Service won't start | `sudo journalctl -u tdocs -e` · `tdocs doctor` |
-| Forgot dashboard password | `tdocs passwd 'new-password'` then `tdocs server` / restart service |
+| `unable to open database file` di `/var/lib/tdocs` | Hak akses: jalankan `sudo -u tdocs tdocs <perintah>` (atau `sudo tdocs <perintah`), lalu restart service |
 | Check download integrity | Compare with `SHA256SUMS` on the release page |
 
 More: [SECURITY.md](SECURITY.md) · [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
