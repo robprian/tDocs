@@ -267,6 +267,10 @@ func runServer(cfg *app.Config) {
 	// Start background periodic snapshot scheduler
 	srv.StartPeriodicBackup(ctx)
 
+	// Non-blocking release check: warms the dashboard update banner and
+	// logs to the journal when a newer release exists.
+	srv.CheckForUpdatesAsync()
+
 	httpServer := &http.Server{
 		Handler: srv,
 	}

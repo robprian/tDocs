@@ -25,6 +25,9 @@ type Config struct {
 	TLSKeyFile       string
 	// Paths carries resolved config/data directories (dev/user/system).
 	Paths *Paths
+	// Version is the build display version ("v2.1.0", "dev"); set by main
+	// from linker-injected metadata so the web layer can report it.
+	Version string
 }
 
 // LoadConfig reads configuration with production precedence:

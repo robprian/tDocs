@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -287,8 +286,6 @@ func runCapture(name string, args ...string) error {
 // tdocs update
 // ---------------------------------------------------------------------------
 
-const releaseRepo = "robprian/tDocs"
-
 func runUpdate(cfg *app.Config, args []string) {
 	checkOnly := false
 	for _, a := range args {
@@ -298,19 +295,40 @@ func runUpdate(cfg *app.Config, args []string) {
 	}
 
 	fmt.Printf("  ◈ tDocs · update (current %s)\n", displayVersion())
-	latest, err := fetchLatestRelease()
+	latest, err := app.FetchLatestRelease(nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  ✕ Could not query GitHub releases: %v\n", err)
 		fmt.Fprintln(os.Stderr, "    Upgrade manually from https://github.com/robprian/tDocs/releases")
 		os.Exit(1)
 	}
-	fmt.Printf("  Latest release: %s (%s)\n", latest.TagName, latest.PublishedAt.Format("2006-01-02"))
-	if displayVersion() == "v"+strings.TrimPrefix(latest.TagName, "v") || displayVersion() == latest.TagName {
+	fmt.Printf("  Latest release: %s (%s)\n", latest.Tag, latest.PublishedAt.Format("2006-01-02"))
+	if !app.IsNewer(displayVersion(), latest.Tag) {
 		fmt.Println("  ✓ Already on the latest release.")
 		return
 	}
 	if checkOnly {
 		fmt.Println("  ○ Update available — run `tdocs update` to install.")
+		return
+	}
+	// Package installs must go through the system package manager: an
+	// in-place binary swap would desync dpkg/rpm and be clobbered (or
+	// conflict) on the next package upgrade.
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  ✕ Cannot resolve current binary path: %v\n", err)
+		os.Exit(1)
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	mode := ""
+	if cfg.Paths != nil {
+		mode = cfg.Paths.Mode
+	}
+	if kind := app.InstallKind(exe, mode); kind == app.InstallDeb || kind == app.InstallRPM {
+		fmt.Printf("  ○ Package install (%s) detected — upgrade via the package manager:\n", kind)
+		fmt.Printf("    %s\n", app.UpgradeHint(kind, latest.Tag, runtime.GOARCH))
+		fmt.Printf("    Release notes: %s\n", app.ReleaseURL(latest.Tag))
 		return
 	}
 	if runtime.GOOS != "linux" {
@@ -319,26 +337,16 @@ func runUpdate(cfg *app.Config, args []string) {
 	}
 
 	goarch := runtime.GOARCH
-	archAlias := map[string]string{"amd64": "amd64", "arm64": "arm64"}[goarch]
-	if archAlias == "" {
+	asset, ok := app.TarballName(latest.Tag, goarch)
+	if !ok {
 		fmt.Fprintf(os.Stderr, "  ✕ No published tarball for %s/%s.\n", runtime.GOOS, goarch)
 		os.Exit(1)
 	}
-	pkgVer := strings.TrimPrefix(latest.TagName, "v")
-	asset := fmt.Sprintf("tdocs_%s_linux_%s.tar.gz", pkgVer, archAlias)
 
-	sumsURL := ""
-	assetURL := ""
-	for _, a := range latest.Assets {
-		switch a.Name {
-		case "SHA256SUMS":
-			sumsURL = a.BrowserDownloadURL
-		case asset:
-			assetURL = a.BrowserDownloadURL
-		}
-	}
+	sumsURL := latest.AssetURL("SHA256SUMS")
+	assetURL := latest.AssetURL(asset)
 	if assetURL == "" {
-		fmt.Fprintf(os.Stderr, "  ✕ Asset %s not found in release %s.\n", asset, latest.TagName)
+		fmt.Fprintf(os.Stderr, "  ✕ Asset %s not found in release %s.\n", asset, latest.Tag)
 		os.Exit(1)
 	}
 
@@ -392,14 +400,6 @@ func runUpdate(cfg *app.Config, args []string) {
 		os.Exit(1)
 	}
 
-	exe, err := os.Executable()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "  ✕ Cannot resolve current binary path: %v\n", err)
-		os.Exit(1)
-	}
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
 	backup := exe + ".bak"
 	if err := copyFile(exe, backup); err != nil {
 		fmt.Fprintf(os.Stderr, "  ✕ Backup of current binary failed: %v\n", err)
@@ -412,46 +412,9 @@ func runUpdate(cfg *app.Config, args []string) {
 		os.Exit(1)
 	}
 	_ = os.Chmod(exe, 0o755)
-	fmt.Printf("  ✓ Updated %s → %s (backup: %s)\n", exe, latest.TagName, backup)
+	fmt.Printf("  ✓ Updated %s → %s (backup: %s)\n", exe, latest.Tag, backup)
 	fmt.Println("  ○ Restart the service if running: sudo systemctl restart tdocs")
 	fmt.Println("  ○ Database and configuration were not modified.")
-}
-
-type ghAsset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-type ghRelease struct {
-	TagName     string    `json:"tag_name"`
-	PublishedAt time.Time `json:"published_at"`
-	Assets      []ghAsset `json:"assets"`
-}
-
-func fetchLatestRelease() (*ghRelease, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/"+releaseRepo+"/releases/latest", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "tdocs-update/"+displayVersion())
-	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API HTTP %d", resp.StatusCode)
-	}
-	var rel ghRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, err
-	}
-	return &rel, nil
 }
 
 func downloadFile(url, dest string) error {

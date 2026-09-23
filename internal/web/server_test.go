@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"tdocs/internal/app"
 	"tdocs/internal/db"
@@ -534,5 +536,85 @@ func TestWebServer_WizardStartWithoutTelegramBackend(t *testing.T) {
 	}
 	if _, ok := body["hint"].(string); !ok {
 		t.Fatalf("Expected actionable hint in response, got %v", body)
+	}
+}
+
+func TestWebServer_UpdateStatusBanner(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open db failed: %v", err)
+	}
+	defer database.Close()
+
+	// Stub the GitHub lookup: deterministic, no network.
+	oldFetch := updateFetchFunc
+	calls := 0
+	updateFetchFunc = func(ctx context.Context) (*app.ReleaseInfo, error) {
+		calls++
+		return &app.ReleaseInfo{Tag: "v9.9.9"}, nil
+	}
+	defer func() { updateFetchFunc = oldFetch }()
+
+	cfg := &app.Config{
+		Port:          "8080",
+		DBPath:        dbPath,
+		SecretKey:     "test-secret-key-32b",
+		AdminPassword: "supersecretpassword",
+		Version:       "v2.1.0",
+	}
+	server, err := NewServer(cfg, database, nil)
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	getStatus := func() map[string]any {
+		req := httptest.NewRequest("GET", "/api/update/status", nil)
+		req.Header.Set("Authorization", "Bearer supersecretpassword")
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 for update status, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("update status is not JSON: %v", err)
+		}
+		return body
+	}
+
+	// Poll until the background refresh lands (max ~5s).
+	var body map[string]any
+	for i := 0; i < 50; i++ {
+		body = getStatus()
+		if avail, _ := body["available"].(bool); avail {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if avail, _ := body["available"].(bool); !avail {
+		t.Fatalf("Expected available=true, got %v", body)
+	}
+	if body["latest"] != "v9.9.9" {
+		t.Fatalf("Expected latest=v9.9.9, got %v", body)
+	}
+	if hint, _ := body["hint"].(string); hint == "" {
+		t.Fatalf("Expected upgrade hint, got %v", body)
+	}
+	if body["current"] != "v2.1.0" {
+		t.Fatalf("Expected current=v2.1.0, got %v", body)
+	}
+	if calls == 0 {
+		t.Fatal("Expected at least one release lookup")
+	}
+
+	// Unauthenticated callers get no version intelligence.
+	req := httptest.NewRequest("GET", "/api/update/status", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("Expected 403 without admin auth, got %d", rec.Code)
 	}
 }

@@ -179,6 +179,20 @@
                 </button>
             </div>
 
+            <!-- Update Banner (only when a newer release exists) -->
+            <div id="update-banner" class="wizard-banner" style="display: none;">
+                <div class="wizard-banner-icon">
+                    <svg class="icon icon-lg" viewBox="0 0 24 24" style="color: var(--warning);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div class="wizard-banner-body">
+                    <div class="wizard-banner-title">Update available: <span id="update-version"></span></div>
+                    <div class="wizard-banner-sub"><code id="update-hint" style="user-select: all;"></code></div>
+                </div>
+                <button class="btn btn-secondary" id="update-copy-btn" onclick="copyUpdateHint()">Copy command</button>
+                <a class="btn btn-primary" id="update-release-link" href="https://github.com/robprian/tDocs/releases" target="_blank" rel="noopener noreferrer">View release</a>
+                <button class="btn-icon" onclick="dismissUpdateBanner()" title="Dismiss" aria-label="Dismiss update banner" style="margin-left: 4px;">✕</button>
+            </div>
+
             <!-- Overview Dashboard Tab -->
             <div id="overview-content-container">
                 <div class="overview-cols">

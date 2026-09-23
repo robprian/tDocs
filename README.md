@@ -172,6 +172,11 @@ Copy `.env.example` → config dir `.env` (mode `600`), or run `tdocs setup`.
 
 Upgrades never delete the database, Telegram session, shares, or settings.
 
+When a newer release exists, the dashboard shows an **update banner** with the
+exact upgrade command for your install type (checked against GitHub at most
+once per day; dismissal is remembered per version). `tdocs update --check`
+reports the same from the CLI.
+
 **Debian / Ubuntu**
 
 ```bash
@@ -195,12 +200,16 @@ sudo install -m 755 ./tdocs-new /usr/bin/tdocs
 sudo systemctl start tdocs
 ```
 
-**Built-in helper** (linux tarball artifacts + checksum verification):
+**Built-in helper** (tarball installs only, amd64/arm64 + checksum verification):
 
 ```bash
 tdocs update           # download latest release, verify SHA256, swap binary
 tdocs update --check   # report only
 ```
+
+> `tdocs update` refuses on `.deb`/`.rpm` installs and prints the right
+> package-manager command instead — in-place swaps would desync dpkg/rpm.
+> There is no one-click in-place upgrade from the dashboard by design.
 
 Apply schema migrations with `tdocs migrate` (also runs automatically on start). A database written by a **newer** tDocs fails safely with a clear error instead of corrupting data.
 

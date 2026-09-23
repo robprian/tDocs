@@ -37,6 +37,7 @@ var banner = bannerText()
 
 func main() {
 	cfg := app.LoadConfig()
+	cfg.Version = displayVersion()
 
 	// First-run / default entry: bare `tdocs` behaves like `tdocs start`
 	// (setup wizard when unconfigured, otherwise the normal start flow).

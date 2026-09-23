@@ -126,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshNotifications();
     checkTelegramSetup();
     refreshTelegramState(false);
+    checkForUpdates();
     setInterval(checkTelegramSetup, 20000);
     setInterval(refreshStatus, 15000);
     setInterval(refreshNotifications, 30000);
@@ -246,6 +247,60 @@ async function testTelegramConnection() {
 }
 
 let lastTelegramState = null;
+
+// --- Self-update banner ------------------------------------------------------
+// Polls /api/update/status once per page load (the server caches GitHub for
+// 24h). Shows a banner with the exact upgrade command for this install kind.
+// Dismissal is remembered per released version, not forever.
+async function checkForUpdates(retry) {
+    try {
+        const res = await apiFetch("/api/update/status");
+        if (!res.ok) return;
+        const s = await res.json();
+        if (s.checking && !s.latest && !retry) {
+            // First check still in flight server-side; retry once shortly.
+            setTimeout(() => checkForUpdates(true), 15000);
+            return;
+        }
+        if (!s.available || !s.latest) return;
+        if (localStorage.getItem("tdocs_update_dismissed") === s.latest) return;
+        const banner = document.getElementById("update-banner");
+        if (!banner) return;
+        const ver = document.getElementById("update-version");
+        if (ver) ver.textContent = "tDocs " + s.latest + " (running " + (s.current || "?") + ")";
+        const hint = document.getElementById("update-hint");
+        if (hint) hint.textContent = s.hint || "tdocs update";
+        const link = document.getElementById("update-release-link");
+        if (link && s.url) link.href = s.url;
+        banner.style.display = "";
+    } catch (_) {
+        // Update checks are best-effort; never break the dashboard.
+    }
+}
+
+function dismissUpdateBanner() {
+    const banner = document.getElementById("update-banner");
+    const ver = document.getElementById("update-version");
+    try {
+        const m = banner && ver ? (ver.textContent.match(/tDocs\s+(\S+)/) || []) : [];
+        if (m[1]) localStorage.setItem("tdocs_update_dismissed", m[1]);
+    } catch (_) {}
+    if (banner) banner.style.display = "none";
+}
+
+function copyUpdateHint() {
+    const hint = document.getElementById("update-hint");
+    const text = hint ? hint.textContent : "";
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+            () => showToast("Upgrade command copied", "success", 2500),
+            () => showToast(text, "info", 6000)
+        );
+    } else {
+        showToast(text, "info", 6000);
+    }
+}
 
 async function refreshTelegramState(live) {
     try {

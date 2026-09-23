@@ -48,6 +48,13 @@ type Server struct {
 	unlockedMu     sync.RWMutex
 	unlockedTokens map[string]time.Time
 
+	// Update-check cache (GitHub release lookup, max once per 24h).
+	updateMu        sync.Mutex
+	updateLatest    *app.ReleaseInfo
+	updateCheckedAt time.Time
+	updateFlight    bool
+	updateErr       error
+
 	// Last verified Telegram backend state (never inferred from config alone).
 	tgHealthMu sync.Mutex
 	tgHealth   tgHealthSnapshot
@@ -206,6 +213,9 @@ func (s *Server) routes() {
 	// Verified backend state + explicit live connection test (superuser only).
 	s.mux.HandleFunc("GET /api/telegram/state", s.superuserOnly(s.handleTelegramState))
 	s.mux.HandleFunc("POST /api/telegram/test", s.superuserOnly(s.handleTelegramTest))
+
+	// Self-update status for the dashboard banner (superuser only).
+	s.mux.HandleFunc("GET /api/update/status", s.superuserOnly(s.handleUpdateStatus))
 
 	// API contract
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPIJSON)
