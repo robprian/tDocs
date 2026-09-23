@@ -3955,6 +3955,28 @@ const TgWizard = {
         const errBox = document.getElementById("tg-wiz-error");
         if (errBox) errBox.style.display = "none";
         this._setStep("phone");
+        // Preflight: starting the wizard requires a logged-in admin AND a
+        // server-side Telegram backend (API_ID/HASH loaded at startup).
+        // Fail fast with an actionable message instead of a generic
+        // "Failed to start wizard" after the phone number is entered.
+        try {
+            const res = await apiFetch("/api/telegram/wizard/needed");
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 403) {
+                this._showError("Please log in as administrator first, then open the Telegram setup again.");
+                return;
+            }
+            if (res.ok && data.configured === false) {
+                this._showError("Server is missing Telegram API credentials. On the server run `tdocs setup` (API_ID + API_HASH from my.telegram.org), restart tdocs, then try again.");
+                return;
+            }
+            if (res.ok && data.configured === true && data.client_available === false) {
+                this._showError("API credentials are saved but not loaded. Restart the server (`systemctl restart tdocs`), then try again.");
+                return;
+            }
+        } catch (_) {
+            // Non-fatal: the start call below surfaces the real error.
+        }
         // Permit the user to immediately scroll/click the phone field.
         setTimeout(() => {
             const el = document.getElementById("tg-wiz-phone");
@@ -4117,9 +4139,17 @@ const TgWizard = {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ phone })
                 });
-                const data = await res.json().catch(() => ({}));
+                // Read text first: error responses are not always JSON, and a
+                // failed res.json() consumes the body (hiding the real message).
+                const raw = await res.text().catch(() => "");
+                let data = {};
+                try {
+                    data = raw ? JSON.parse(raw) : {};
+                } catch (_) {
+                    data = raw ? { error: raw } : {};
+                }
                 if (!res.ok || !data.id) {
-                    this._showError(data.error || "Failed to start wizard");
+                    this._showError(data.error || data.message || ("Server returned HTTP " + res.status));
                     document.getElementById("tg-wiz-action-text").textContent = "Send Code";
                     if (btn) btn.disabled = false;
                     return;

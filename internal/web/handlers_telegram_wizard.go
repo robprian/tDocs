@@ -27,12 +27,18 @@ func (s *Server) handleTelegramWizardStart(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if s.tg == nil {
-		http.Error(w, "telegram client not initialized on server", http.StatusServiceUnavailable)
+		// JSON (not plain-text http.Error): the dashboard parses the body
+		// and a non-JSON 503 used to surface as generic "Failed to start wizard".
+		jsonOut(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "telegram client not initialized on server",
+			"code":  "telegram_not_configured",
+			"hint":  "Set API credentials first: run `tdocs setup` on the server (API_ID + API_HASH from my.telegram.org), then restart tdocs.",
+		})
 		return
 	}
 	id, err := s.startWebWizard(r.Context(), phone)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		jsonOut(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	_ = s.db.Audit("admin", "telegram_wizard_start", phone, clientIP(r))

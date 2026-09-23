@@ -474,3 +474,65 @@ func TestWebServer_CDNAndDocs(t *testing.T) {
 		t.Fatalf("Expected Swagger UI docs page, got %d", rec.Code)
 	}
 }
+
+func TestWebServer_WizardStartWithoutTelegramBackend(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open db failed: %v", err)
+	}
+	defer database.Close()
+
+	cfg := &app.Config{
+		Port:          "8080",
+		DBPath:        dbPath,
+		SecretKey:     "test-secret-key-32b",
+		AdminPassword: "supersecretpassword",
+	}
+
+	// nil manager: server runs degraded without Telegram credentials.
+	server, err := NewServer(cfg, database, nil)
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	// Preflight reports the backend as unavailable (drives the UI message).
+	req := httptest.NewRequest("GET", "/api/telegram/wizard/needed", nil)
+	req.Header.Set("Authorization", "Bearer supersecretpassword")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for needed, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var needed map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &needed); err != nil {
+		t.Fatalf("needed is not JSON: %v", err)
+	}
+	if needed["client_available"] != false {
+		t.Fatalf("Expected client_available=false, got %v", needed["client_available"])
+	}
+
+	// Wizard start must fail with machine-readable JSON (never plain text):
+	// the dashboard renders .error/.hint instead of "Failed to start wizard".
+	payload, _ := json.Marshal(map[string]any{"phone": "+628123456789"})
+	req = httptest.NewRequest("POST", "/api/telegram/wizard/start", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer supersecretpassword")
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("Expected 503 for wizard start without backend, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("wizard start error is not JSON: %v (body %q)", err, rec.Body.String())
+	}
+	if body["code"] != "telegram_not_configured" {
+		t.Fatalf("Expected code=telegram_not_configured, got %v", body)
+	}
+	if _, ok := body["hint"].(string); !ok {
+		t.Fatalf("Expected actionable hint in response, got %v", body)
+	}
+}
