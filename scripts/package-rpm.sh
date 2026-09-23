@@ -45,7 +45,7 @@ if ! command -v rpmbuild >/dev/null 2>&1; then
 fi
 
 TOP="$(mktemp -d)"
-trap 'rm -rf "$TOP"' EXIT
+trap 'rm -rf "$TOP" 2>/dev/null || sudo rm -rf "$TOP" 2>/dev/null || true' EXIT
 
 mkdir -p "$TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 PKGDIR="$TOP/SOURCES/tdocs-$VERSION"

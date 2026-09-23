@@ -31,7 +31,7 @@ if [ ! -f "$BIN" ]; then
 fi
 
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
+trap 'rm -rf "$STAGE" 2>/dev/null || sudo rm -rf "$STAGE" 2>/dev/null || true' EXIT
 
 PKGROOT="$STAGE/tdocs"
 mkdir -p "$PKGROOT/systemd"

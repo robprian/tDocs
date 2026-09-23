@@ -41,7 +41,7 @@ fi
 command -v dpkg-deb >/dev/null || { echo "dpkg-deb not found" >&2; exit 1; }
 
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
+trap 'rm -rf "$STAGE" 2>/dev/null || sudo rm -rf "$STAGE" 2>/dev/null || true' EXIT
 
 PKG="$STAGE/pkg"
 mkdir -p "$PKG/DEBIAN" \
