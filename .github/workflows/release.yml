@@ -427,7 +427,7 @@ jobs:
     name: Publish npm wrapper (optional)
     needs: [release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && env.NPM_TOKEN != ''
+    if: startsWith(github.ref, 'refs/tags/v')
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
@@ -437,6 +437,8 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - name: Publish
+        # Step-level `if` (unlike job-level) may read `env`.
+        if: ${{ env.NPM_TOKEN != '' }}
         run: |
           TAG_VER="${GITHUB_REF_NAME#v}"
           npm version "${TAG_VER}" --no-git-tag-version --allow-same-version
