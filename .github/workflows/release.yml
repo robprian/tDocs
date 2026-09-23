@@ -253,7 +253,7 @@ jobs:
             set -euo pipefail
             PKG="$(echo /pkg/*.deb)"
             apt-get update -qq
-            apt-get install -y -qq "$PKG"
+            apt-get install -y -qq curl "$PKG"
             # apt path for local deb:
             command -v tdocs
             tdocs version
