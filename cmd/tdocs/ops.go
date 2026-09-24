@@ -301,18 +301,16 @@ func runUpdate(cfg *app.Config, args []string) {
 		fmt.Fprintln(os.Stderr, "    Upgrade manually from https://github.com/robprian/tDocs/releases")
 		os.Exit(1)
 	}
-	fmt.Printf("  Latest release: %s (%s)\n", latest.Tag, latest.PublishedAt.Format("2006-01-02"))
+	// Same version: nothing to advertise, so no release line and no command.
 	if !app.IsNewer(displayVersion(), latest.Tag) {
 		fmt.Println("  ✓ Already on the latest release.")
 		return
 	}
+	fmt.Printf("  Latest release: %s (%s)\n", latest.Tag, latest.PublishedAt.Format("2006-01-02"))
 	if checkOnly {
 		fmt.Println("  ○ Update available — run `tdocs update` to install.")
 		return
 	}
-	// Package installs must go through the system package manager: an
-	// in-place binary swap would desync dpkg/rpm and be clobbered (or
-	// conflict) on the next package upgrade.
 	exe, err := os.Executable()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  ✕ Cannot resolve current binary path: %v\n", err)
@@ -326,6 +324,59 @@ func runUpdate(cfg *app.Config, args []string) {
 		mode = cfg.Paths.Mode
 	}
 	if kind := app.InstallKind(exe, mode); kind == app.InstallDeb || kind == app.InstallRPM {
+		if name, ok := app.PackageName(kind, latest.Tag, runtime.GOARCH); ok {
+			if url := latest.AssetURL(name); url != "" {
+				tmp, tErr := os.MkdirTemp("", "tdocs-update-")
+				if tErr == nil {
+					defer os.RemoveAll(tmp)
+					pkgPath := filepath.Join(tmp, name)
+					sumsURL := latest.AssetURL("SHA256SUMS")
+					fmt.Printf("  ↓ Downloading %s …\n", name)
+					if dErr := downloadFile(url, pkgPath); dErr != nil {
+						fmt.Fprintf(os.Stderr, "  ✕ Download failed: %v\n", dErr)
+						os.Exit(1)
+					}
+					if sumsURL != "" {
+						sumsPath := filepath.Join(tmp, "SHA256SUMS")
+						if dErr := downloadFile(sumsURL, sumsPath); dErr == nil {
+							if want, lErr := lookupSHA256(sumsPath, name); lErr == nil {
+								if got, hErr := fileSHA256(pkgPath); hErr == nil && got == want {
+									fmt.Println("  ✓ SHA256 checksum verified")
+								} else {
+									fmt.Fprintf(os.Stderr, "  ✕ Checksum mismatch (want %s got %s)\n", want, got)
+									os.Exit(1)
+								}
+							}
+						}
+					}
+					// Auto-install via package manager (no second download).
+					if kind == app.InstallDeb {
+						fmt.Printf("  → Installing %s via apt …\n", name)
+						if err := exec.Command("sudo", "apt", "update").Run(); err != nil {
+							fmt.Fprintf(os.Stderr, "  ○ apt update warning: %v\n", err)
+						}
+						cmd := exec.Command("sudo", append([]string{"apt", "install", "-y"}, pkgPath)...)
+						cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+						if err := cmd.Run(); err != nil {
+							fmt.Fprintf(os.Stderr, "  ✕ Install failed: %v\n  Hint: %s\n  Release: %s\n", err, app.UpgradeHint(kind, latest.Tag, runtime.GOARCH), app.ReleaseURL(latest.Tag))
+							os.Exit(1)
+						}
+					} else {
+						bin, args := app.PackageManager(kind)
+						fmt.Printf("  → Installing %s via %s …\n", name, bin)
+						cmd := exec.Command("sudo", append([]string{bin}, append(args, pkgPath)...)...)
+						cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+						if err := cmd.Run(); err != nil {
+							fmt.Fprintf(os.Stderr, "  ✕ Install failed: %v\n  Hint: %s\n  Release: %s\n", err, app.UpgradeHint(kind, latest.Tag, runtime.GOARCH), app.ReleaseURL(latest.Tag))
+							os.Exit(1)
+						}
+					}
+					fmt.Printf("  ✓ Updated to %s via %s package\n", latest.Tag, kind)
+					fmt.Println("  ○ Restart the service if running: sudo systemctl restart tdocs")
+					return
+				}
+			}
+		}
 		fmt.Printf("  ○ Package install (%s) detected — upgrade via the package manager:\n", kind)
 		fmt.Printf("    %s\n", app.UpgradeHint(kind, latest.Tag, runtime.GOARCH))
 		fmt.Printf("    Release notes: %s\n", app.ReleaseURL(latest.Tag))

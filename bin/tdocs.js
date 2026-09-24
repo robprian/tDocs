@@ -12,21 +12,35 @@ const https = require('node:https');
 const os = require('node:os');
 const path = require('node:path');
 
-const VERSION = '2.0.0';
-const BINARY_VERSION = '2.0.0';
+// Version comes from package.json (the release workflow rewrites it), so the
+// wrapper can never drift from the binary it downloads.
+const VERSION = require('../package.json').version;
+const BINARY_VERSION = VERSION;
 
-// Map process.platform to tDocs release platform name
+// Map process.platform to tDocs release platform name. Only linux artifacts
+// are published; other platforms fall back to a local Go build.
 const PLATFORM_MAP = {
-  linux: 'linux',
-  darwin: 'darwin',
-  win32: 'windows'
+  linux: 'linux'
 };
 
-// Map process.arch to tDocs release architecture name
+// Map process.arch to the GOARCH suffix used in published artifact names.
+// GOARCH=arm ships as armv7 (GOARM=7 build) — see scripts/build-release.sh.
 const ARCH_MAP = {
   x64: 'amd64',
-  arm64: 'arm64'
+  arm64: 'arm64',
+  ia32: '386',
+  arm: 'armv7',
+  ppc64: 'ppc64le',
+  s390x: 's390x'
 };
+
+// TarballName mirrors internal/app.TarballName: tdocs_<ver>_linux_<arch>.tar.gz
+function tarballName() {
+  const platform = PLATFORM_MAP[process.platform];
+  const arch = ARCH_MAP[process.arch];
+  if (!platform || !arch) return null;
+  return `tdocs_${BINARY_VERSION}_${platform}_${arch}.tar.gz`;
+}
 
 function getBinaryName() {
   return process.platform === 'win32' ? 'tdocs.exe' : 'tdocs';
@@ -126,28 +140,24 @@ async function ensureBinary() {
   const existing = findLocalBinary();
   if (existing) return existing;
 
-  const platform = PLATFORM_MAP[process.platform];
-  const arch = ARCH_MAP[process.arch];
-
-  if (!platform || !arch) {
-    throw new Error(`Unsupported platform or architecture: ${process.platform}-${process.arch}`);
+  const name = tarballName();
+  if (!name) {
+    throw new Error(`Unsupported platform or architecture: ${process.platform}-${process.arch} (linux tarballs only; set TDOCS_BINARY_PATH to a local build)`);
   }
 
   const cacheDir = getCacheDir();
   fs.mkdirSync(cacheDir, { recursive: true });
 
-  const binTarget = path.join(cacheDir, `tdocs-v${BINARY_VERSION}${process.platform === 'win32' ? '.exe' : ''}`);
-  const ext = (platform === 'windows') ? '.zip' : '.tar.gz';
-  const archiveName = `tdocs-v${BINARY_VERSION}-${platform}-${arch}${ext}`;
-  const downloadArchive = path.join(cacheDir, archiveName);
-  const releaseUrl = `https://github.com/robprian/tDocs/releases/download/v${BINARY_VERSION}/${archiveName}`;
+  const binTarget = path.join(cacheDir, `tdocs-v${BINARY_VERSION}`);
+  const downloadArchive = path.join(cacheDir, name);
+  const releaseUrl = `https://github.com/robprian/tDocs/releases/download/v${BINARY_VERSION}/${name}`;
 
-  console.log(`[tdocs] Binary not found locally. Downloading tDocs v${BINARY_VERSION} for ${platform}/${arch}...`);
+  console.log(`[tdocs] Binary not found locally. Downloading tDocs v${BINARY_VERSION} for ${process.platform}/${process.arch}...`);
 
   try {
     await downloadUrl(releaseUrl, downloadArchive);
 
-    extractArchive(downloadArchive, cacheDir, platform);
+    extractArchive(downloadArchive, cacheDir, 'linux');
 
     // Clean up archive
     try { fs.unlinkSync(downloadArchive); } catch (_) {}

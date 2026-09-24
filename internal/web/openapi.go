@@ -1,17 +1,17 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 )
 
-// openAPISpec is the machine-readable contract for every tDocs HTTP route,
-// including the public CDN surface consumed by external websites (e.g. a film
-// site). Served at GET /api/openapi.json, rendered at GET /docs.
-const openAPISpec = `{
+// openAPISpecTmpl is rendered per-request so the reported version always
+// matches the running binary (a const would go stale on every release).
+const openAPISpecTmpl = `{
   "openapi": "3.0.3",
   "info": {
     "title": "tDocs API",
-    "version": "2.0.0",
+    "version": "%s",
     "description": "Self-hosted cloud storage on Telegram MTProto. Dashboard cookie auth or Authorization Bearer header with TDOCS_ADMIN_PASSWORD for machine clients. CDN stream URLs are public by default (TDOCS_CDN_PUBLIC) so video/audio/img tags can embed them directly."
   },
   "servers": [{ "url": "/" }],
@@ -173,6 +173,9 @@ const openAPISpec = `{
     "/api/telegram/wizard/discard": {
       "post": { "summary": "Clean up a finished wizard (superuser only)", "requestBody": { "content": { "application/json": { "schema": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } } } } } }, "responses": { "200": { "description": "{ok}" } } }
     },
+    "/api/telegram/wizard/cancel": {
+      "post": { "summary": "Abandon an in-flight wizard so a fresh code can be requested (superuser only)", "requestBody": { "content": { "application/json": { "schema": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } } } } } }, "responses": { "200": { "description": "{ok}" } } }
+    },
     "/api/telegram/wizard/needed": {
       "get": { "summary": "Whether browser pairing is needed (superuser only)", "responses": { "200": { "description": "{configured, client_available, storage_channel, telegram_authorized, superuser}" } } }
     },
@@ -232,10 +235,15 @@ const openAPISpec = `{
 
 func (s *Server) handleOpenAPIJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(openAPISpec))
+	w.Write([]byte(s.renderOpenAPISpec()))
 }
 
-const docsPage = `<!DOCTYPE html>
+// renderOpenAPISpec injects the running binary version into the contract.
+func (s *Server) renderOpenAPISpec() string {
+	return fmt.Sprintf(openAPISpecTmpl, s.currentVersion())
+}
+
+const docsPageTmpl = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tDocs API · Docs</title>
@@ -256,7 +264,7 @@ const docsPage = `<!DOCTYPE html>
 .curl-hint code{font-family:ui-monospace,Menlo,Consolas,monospace}
 </style>
 </head><body>
-<div class="neu-bar"><div class="neu-logo">◈</div><div><div class="neu-title">tDocs API</div><div class="neu-sub">v2.0.0 · cookie <b>tdocs_session</b> atau <b>Authorization: Bearer &lt;admin password&gt;</b></div></div>
+<div class="neu-bar"><div class="neu-logo">◈</div><div><div class="neu-title">tDocs API</div><div class="neu-sub">%s · cookie <b>tdocs_session</b> atau <b>Authorization: Bearer &lt;admin password&gt;</b></div></div>
 <div class="neu-links"><a class="neu-btn primary" href="/api">GET /api (index JSON)</a><a class="neu-btn" href="/api/openapi.json">openapi.json</a><a class="neu-btn" href="/">← Dashboard</a></div></div>
 <p class="curl-hint"><code>curl -H "Authorization: Bearer ADMIN_PASS" "http://localhost:8080/api/cdn/files?mime=video/&amp;limit=100" &nbsp;·&nbsp; embed: &lt;video src="http://localhost:8080/cdn/{id}/stream"&gt;</code></p>
 <div id="ui"></div>
@@ -268,5 +276,10 @@ SwaggerUIBundle({ url: "/api/openapi.json", dom_id: "#ui", deepLinking: true });
 
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(docsPage))
+	w.Write([]byte(s.renderDocsPage()))
+}
+
+// renderDocsPage injects the running binary version into the docs banner.
+func (s *Server) renderDocsPage() string {
+	return fmt.Sprintf(docsPageTmpl, s.currentVersion())
 }

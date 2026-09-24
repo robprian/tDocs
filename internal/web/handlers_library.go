@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"tdocs/internal/db"
 )
@@ -374,10 +376,16 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	if largest == nil {
 		largest = []db.File{}
 	}
+	// Cheap runtime vitals for the dashboard metrics row: a stat() on the
+	// SQLite file and the last recorded Telegram state (never a network call).
 	writeJSON(w, http.StatusOK, map[string]any{
 		"files": files, "folders": folders, "bytes": bytes,
 		"breakdown": breakdown, "recent": recent, "largest": largest,
 		"trashed_files": trashed, "versions": versions, "favorites": len(favs),
+		"db_bytes":       dbFileSize(s.cfg.DBPath),
+		"uptime_seconds": int64(time.Since(s.startedAt).Seconds()),
+		"telegram_state": string(s.lastTelegramHealth().State),
+		"goroutines":     runtime.NumGoroutine(),
 	})
 }
 

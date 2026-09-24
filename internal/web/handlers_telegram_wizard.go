@@ -11,6 +11,7 @@ import (
 // /api/telegram/wizard/start   POST {phone} → {id}
 // /api/telegram/wizard/status  GET  ?id=…  → {phase, success, error}
 // /api/telegram/wizard/submit  POST {id, code, password} → {ok, error}
+// /api/telegram/wizard/cancel  POST {id}             → {ok}
 // /api/telegram/wizard/discard POST {id}             → {ok}
 
 func (s *Server) handleTelegramWizardStart(w http.ResponseWriter, r *http.Request) {
@@ -63,11 +64,17 @@ func (s *Server) handleTelegramWizardStart(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleTelegramWizardStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "missing id", http.StatusBadRequest)
+		jsonOut(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
 		return
 	}
-	s.discardWebWizard(id)
-	jsonOut(w, http.StatusOK, s.snapshotWebWizard(id))
+	snap := s.snapshotWebWizard(id)
+	// Snapshot first: reclaiming a terminal wizard must never affect the
+	// answer. WizardDiscard only drops wizards that finished over ten
+	// minutes ago, so a live one is never removed here.
+	if snap.Phase == "done" || snap.Phase == "error" || snap.Phase == "not_found" {
+		s.discardWebWizard(id)
+	}
+	jsonOut(w, http.StatusOK, snap)
 }
 
 func (s *Server) handleTelegramWizardSubmit(w http.ResponseWriter, r *http.Request) {
@@ -77,18 +84,38 @@ func (s *Server) handleTelegramWizardSubmit(w http.ResponseWriter, r *http.Reque
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
 		return
 	}
 	if body.ID == "" {
-		http.Error(w, "missing id", http.StatusBadRequest)
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "missing id"})
 		return
 	}
 	ok, errStr := s.submitWebWizard(body.ID, body.Code, body.Password)
 	if !ok {
-		http.Error(w, errStr, http.StatusBadRequest)
+		// JSON on purpose: the dashboard reads this body and a plain-text
+		// http.Error surfaced as "bad response" instead of the real reason.
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": errStr})
 		return
 	}
+	jsonOut(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleTelegramWizardCancel abandons an in-flight wizard so the admin can
+// request a fresh login code without waiting for the current one to expire.
+func (s *Server) handleTelegramWizardCancel(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
+		return
+	}
+	if body.ID == "" {
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "missing id"})
+		return
+	}
+	s.cancelWebWizard(body.ID)
 	jsonOut(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -97,9 +124,10 @@ func (s *Server) handleTelegramWizardDiscard(w http.ResponseWriter, r *http.Requ
 		ID string `json:"id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		jsonOut(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
 		return
 	}
+	s.cancelWebWizard(body.ID)
 	s.discardWebWizard(body.ID)
 	jsonOut(w, http.StatusOK, map[string]any{"ok": true})
 }

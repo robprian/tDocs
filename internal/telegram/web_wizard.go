@@ -83,6 +83,7 @@ func WizardStart(ctx context.Context, m *ClientManager, phone string) (string, e
 	if m == nil {
 		return "", fmt.Errorf("telegram client not initialized")
 	}
+	sweepWizards()
 
 	// Only skip the wizard when Telegram itself confirms the stored session is
 	// authorized. The cached flag is not trusted here: a stale
@@ -320,6 +321,46 @@ func WizardDiscard(id string) {
 			delete(webWizards, id)
 		}
 	}
+}
+
+// sweepWizards drops terminal wizards that no browser can still be polling.
+// WizardStart calls it so closed or abandoned sessions cannot accumulate in
+// memory for the lifetime of the process.
+func sweepWizards() {
+	webWizardsMu.Lock()
+	defer webWizardsMu.Unlock()
+	for id, w := range webWizards {
+		if w.done && time.Since(w.created) > 10*time.Minute {
+			delete(webWizards, id)
+		}
+	}
+}
+
+// WizardCancel abandons an in-flight wizard so a fresh code can be requested.
+// The entry is dropped right away: the browser that cancelled it has already
+// stopped polling, and the blocked auth callback unblocks on the done flag
+// within one poll tick.
+func WizardCancel(id string) {
+	webWizardsMu.Lock()
+	defer webWizardsMu.Unlock()
+	w, ok := webWizards[id]
+	if !ok {
+		return
+	}
+	w.mu.Lock()
+	if !w.done {
+		w.done = true
+		if w.phase != "error" {
+			w.phase = "error"
+		}
+		if w.err == "" {
+			w.err = "wizard cancelled"
+		}
+		w.code = ""
+		w.password = ""
+	}
+	w.mu.Unlock()
+	delete(webWizards, id)
 }
 
 func newWizardID() string {

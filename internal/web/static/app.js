@@ -262,7 +262,10 @@ async function checkForUpdates(retry) {
             setTimeout(() => checkForUpdates(true), 15000);
             return;
         }
-        if (!s.available || !s.latest) return;
+        // Only advertise a release the running build is actually behind. An
+        // equal version (or a missing current version) means nothing to show.
+        if (!s.available || !s.latest || !s.current) return;
+        if (s.latest === s.current) return;
         if (localStorage.getItem("tdocs_update_dismissed") === s.latest) return;
         const banner = document.getElementById("update-banner");
         if (!banner) return;
@@ -2098,7 +2101,39 @@ function renderOverviewFolders(folders) {
 }
 
 // ================= Overview Dashboard =================
+function renderOverviewGreeting() {
+    const hour = new Date().getHours();
+    const part = hour < 5 ? "Good night" : hour < 11 ? "Good morning" : hour < 15 ? "Good afternoon" : hour < 19 ? "Good evening" : "Good night";
+    const kicker = document.getElementById("ov-greeting-kicker");
+    const title = document.getElementById("ov-greeting-title");
+    if (kicker) kicker.textContent = part + ",";
+    if (title) title.textContent = "Your library at a glance";
+}
+
+function renderOverviewMetrics(s) {
+    const cards = document.getElementById("ov-stat-cards");
+    if (!cards) return;
+    const health = String(s.telegram_state || "");
+    const healthy = health === "connected";
+    const healthText = healthy ? "Connected" : (health ? tgStateInfo(health).short : "Checking…");
+    const healthCls = healthy ? "stat-health-ok" : "stat-health-bad";
+    cards.innerHTML = `
+        <div class="stat-card stat-card-hero">
+            <div class="hero-top">
+                <span class="hero-main">${getIcon("folder")}<span class="stat-value">${s.files}</span></span>
+                <span class="hero-cloud"><svg class="icon" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
+            </div>
+            <span class="stat-label">Files \u00b7 ${s.folders} folders</span>
+            <span class="hero-foot"><span class="hero-quota">${formatSize(s.bytes)} stored</span><span class="hero-pill ${healthCls}">${escapeHtml(healthText)}</span></span>
+        </div>
+        <div class="stat-card"><span class="stat-label">Stored</span><span class="stat-value">${formatSize(s.bytes)}</span><span class="stat-sub">Telegram Cloud \u00b7 ${formatSize(s.db_bytes || 0)} local DB</span></div>
+        <div class="stat-card"><span class="stat-label">Favorites</span><span class="stat-value">${s.favorites}</span><span class="stat-sub">starred files</span></div>
+        <div class="stat-card"><span class="stat-label">Uptime</span><span class="stat-value" style="font-size:1.15rem;">${formatDuration(s.uptime_seconds || 0)}</span><span class="stat-note ${healthCls}">Telegram: ${escapeHtml(healthText)}</span></div>
+    `;
+}
+
 async function loadOverview() {
+    renderOverviewGreeting();
     skeletonCards(document.getElementById("ov-stat-cards"), 4);
     const _rl = document.getElementById("ov-recent-list");
     if (_rl) _rl.innerHTML = '<div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>';
@@ -2126,22 +2161,7 @@ async function loadOverview() {
             }
         } catch (e) { /* folders are decorative */ }
 
-        const cards = document.getElementById("ov-stat-cards");
-        if (cards) {
-            cards.innerHTML = `
-                <div class="stat-card stat-card-hero">
-                    <div class="hero-top">
-                        <span class="hero-main">${getIcon("folder")}<span class="stat-value">${s.files}</span></span>
-                        <span class="hero-cloud"><svg class="icon" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
-                    </div>
-                    <span class="stat-label">Files · ${s.folders} folders</span>
-                    <span class="hero-foot"><span class="hero-quota">${formatSize(s.bytes)} stored</span><span class="hero-pill">Telegram Cloud</span></span>
-                </div>
-                <div class="stat-card"><span class="stat-label">Stored</span><span class="stat-value">${formatSize(s.bytes)}</span><span class="stat-sub">Telegram Cloud</span></div>
-                <div class="stat-card"><span class="stat-label">Favorites</span><span class="stat-value">${s.favorites}</span><span class="stat-sub">starred files</span></div>
-                <div class="stat-card"><span class="stat-label">Trash</span><span class="stat-value">${s.trashed_files}</span><span class="stat-sub">${s.versions} versions kept</span></div>
-            `;
-        }
+        renderOverviewMetrics(s);
 
         const usedEl = document.getElementById("ov-used");
         const totalQuota = 50 * 1024 * 1024 * 1024;
@@ -4001,38 +4021,49 @@ async function withBtnLoading(btn, fn) {
 const TgWizard = {
     id: null,
     pollHandle: null,
+    phone: "",
+    resendAt: 0,
+    resendTimer: null,
+    verifyRan: false,
+
+    _now() { return Date.now(); },
 
     async open() {
         const modal = document.getElementById("tg-wizard-modal");
         if (modal) modal.style.display = "flex";
+        this.id = null;
+        this.phone = "";
+        this.verifyRan = false;
+        this._clearResendTimer();
         this._setPane("phone");
         document.getElementById("tg-wiz-action-text").textContent = "Send Code";
-        const errBox = document.getElementById("tg-wiz-error");
-        if (errBox) errBox.style.display = "none";
+        this._showError("", "phone");
         this._setStep("phone");
-        // Preflight: starting the wizard requires a logged-in admin AND a
-        // server-side Telegram backend (API_ID/HASH loaded at startup).
-        // Fail fast with an actionable message instead of a generic
-        // "Failed to start wizard" after the phone number is entered.
+        this._setSteps(["phone", "code", "password", "verify"], 0);
         try {
             const res = await apiFetch("/api/telegram/wizard/needed");
             const data = await res.json().catch(() => ({}));
             if (res.status === 403) {
-                this._showError("Please log in as administrator first, then open the Telegram setup again.");
+                this._showError("Please log in as administrator first, then open the Telegram setup again.", "phone");
                 return;
             }
             if (res.ok && data.configured === false) {
-                this._showError("Server is missing Telegram API credentials. On the server run `tdocs setup` (API_ID + API_HASH from my.telegram.org), restart tdocs, then try again.");
+                this._showError("Server is missing Telegram API credentials. On the server run `tdocs setup` (API_ID + API_HASH from my.telegram.org), restart tdocs, then try again.", "phone");
                 return;
             }
             if (res.ok && data.configured === true && data.client_available === false) {
-                this._showError("API credentials are saved but not loaded. Restart the server (`systemctl restart tdocs`), then try again.");
+                this._showError("API credentials are saved but not loaded. Restart the server (`systemctl restart tdocs`), then try again.", "phone");
+                return;
+            }
+            if (res.ok && data.telegram_authorized === true) {
+                this._setStep("verify");
+                this._setPane("verify");
+                document.getElementById("tg-wiz-action-text").textContent = "Verify Storage";
+                this._verifyLive(null);
                 return;
             }
         } catch (_) {
-            // Non-fatal: the start call below surfaces the real error.
         }
-        // Permit the user to immediately scroll/click the phone field.
         setTimeout(() => {
             const el = document.getElementById("tg-wiz-phone");
             if (el) el.focus();
@@ -4043,6 +4074,7 @@ const TgWizard = {
         const modal = document.getElementById("tg-wizard-modal");
         if (modal) modal.style.display = "none";
         this._stopPolling();
+        this._clearResendTimer();
         if (this.id) {
             apiFetch("/api/telegram/wizard/discard", {
                 method: "POST",
@@ -4054,42 +4086,89 @@ const TgWizard = {
     },
 
     _setPane(name) {
-        document.querySelectorAll('.wizard-pane').forEach(p => {
+        document.querySelectorAll('#tg-wizard-modal .wizard-pane').forEach(p => {
             p.style.display = (p.dataset.pane === name) ? "" : "none";
         });
         const titles = {
             phone:   "Send Code",
             code:    "Verify",
             password:"Continue",
+            verify:  "Verify Storage",
             done:    "Done"
         };
         const el = document.getElementById("tg-wiz-action-text");
         if (el && titles[name]) el.textContent = titles[name];
+        const btn = document.getElementById("tg-wiz-action");
+        if (btn) btn.disabled = false;
     },
 
     _setStep(name) {
-        const stepMap = { phone: 0, code: 1, password: 2 };
-        const cur = stepMap[name] ?? 0;
-        document.querySelectorAll('.wizard-step').forEach((node, idx) => {
+        const stepMap = { phone: 0, code: 1, password: 2, verify: 3 };
+        this._setSteps(["phone", "code", "password", "verify"], stepMap[name] ?? 0);
+    },
+
+    _setSteps(names, cur) {
+        const nodes = Array.from(document.querySelectorAll('#tg-wizard-modal .wizard-step'));
+        nodes.forEach((node, idx) => {
             node.classList.remove("active", "done");
             if (idx < cur) node.classList.add("done");
             else if (idx === cur) node.classList.add("active");
         });
-        document.querySelectorAll('.wizard-step-line').forEach((line, idx) => {
+        document.querySelectorAll('#tg-wizard-modal .wizard-step-line').forEach((line, idx) => {
             line.classList.toggle("done", idx < cur);
         });
     },
 
-    _showError(msg) {
-        const errBox = document.getElementById("tg-wiz-error");
-        if (!errBox) return;
-        if (!msg) {
-            errBox.style.display = "none";
-            errBox.textContent = "";
+    _showError(msg, pane) {
+        const modal = document.getElementById("tg-wizard-modal");
+        if (!modal) return;
+        const boxes = modal.querySelectorAll(".wizard-error[data-error]");
+        const legacy = document.getElementById("tg-wiz-error");
+        if (pane) {
+            const paneEl = modal.querySelector(`.wizard-pane[data-pane="${pane}"] .wizard-error`);
+            boxes.forEach(b => { if (b !== paneEl) { b.style.display = "none"; b.textContent = ""; } });
+            if (paneEl) {
+                if (!msg) { paneEl.style.display = "none"; paneEl.textContent = ""; }
+                else { paneEl.style.display = "block"; paneEl.textContent = msg; }
+            }
+            if (legacy) { legacy.style.display = "none"; legacy.textContent = ""; }
             return;
         }
-        errBox.style.display = "block";
-        errBox.textContent = msg;
+        boxes.forEach(b => {
+            if (!msg) { b.style.display = "none"; b.textContent = ""; }
+            else if (b.closest(".wizard-pane") && b.closest(".wizard-pane").style.display !== "none") {
+                b.style.display = "block"; b.textContent = msg;
+            }
+        });
+        if (legacy && msg) { legacy.style.display = "block"; legacy.textContent = msg; }
+    },
+
+    _startResendTimer() {
+        this.resendAt = this._now() + 60000;
+        this._tickResend();
+        this._clearResendTimer();
+        this.resendTimer = setInterval(() => this._tickResend(), 1000);
+    },
+
+    _tickResend() {
+        const btn = document.getElementById("tg-wiz-resend");
+        const txt = document.getElementById("tg-wiz-resend-text");
+        if (!btn) return;
+        const left = Math.max(0, Math.ceil((this.resendAt - this._now()) / 1000));
+        if (left <= 0) {
+            btn.disabled = false;
+            btn.textContent = "Resend code";
+            if (txt) txt.textContent = "Didn't get the code? Request a fresh one.";
+            this._clearResendTimer();
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = `Resend code (${left}s)`;
+        if (txt) txt.textContent = "Code sent. Wait for the timer before requesting a new one.";
+    },
+
+    _clearResendTimer() {
+        if (this.resendTimer) { clearInterval(this.resendTimer); this.resendTimer = null; }
     },
 
     async _startPoll() {
@@ -4101,29 +4180,38 @@ const TgWizard = {
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data.success) {
-                    this._finish(data.error || "");
-                } else if (data.phase === "waiting_code") {
+                    this._stopPolling();
+                    this._setSteps(["phone", "code", "password", "verify"], 3);
+                    this._setStep("verify");
+                    this._setPane("verify");
+                    this._verifyLive(data.error || "");
+                    return;
+                }
+                if (data.phase === "waiting_code") {
                     this._setStep("code");
                     this._setPane("code");
-                    const phone = data.phone || "";
-                    document.getElementById("tg-wiz-action-text").textContent = "Verify Code";
                     setTimeout(() => document.getElementById("tg-wiz-code")?.focus(), 50);
                 } else if (data.phase === "waiting_password") {
+                    this._clearResendTimer();
                     this._setStep("password");
                     this._setPane("password");
-                    document.getElementById("tg-wiz-action-text").textContent = "Unlock";
                     setTimeout(() => document.getElementById("tg-wiz-password")?.focus(), 50);
                 } else if (data.phase === "error") {
                     this._stopPolling();
-                    this._showError(data.error || "Wizard failed");
-                    // The failed wizard is terminal on the server, so a retry
-                    // must start a fresh one from the phone step.
+                    this._clearResendTimer();
+                    this._showError(data.error || "Wizard failed", "phone");
                     this.id = null;
                     this._setStep("phone");
                     this._setPane("phone");
                     document.getElementById("tg-wiz-action-text").textContent = "Try Again";
+                } else if (data.phase === "not_found") {
+                    this._stopPolling();
+                    this._showError("That setup session expired. Enter your phone number again for a fresh code.", "phone");
+                    this.id = null;
+                    this._setStep("phone");
+                    this._setPane("phone");
                 }
-            } catch (e) { /* keep polling */ }
+            } catch (e) { }
         }, 1200);
     },
 
@@ -4134,20 +4222,70 @@ const TgWizard = {
         }
     },
 
+    _renderVerify(rows) {
+        const box = document.getElementById("tg-wiz-verify-list");
+        if (!box) return;
+        const row = (state, text) => `<div class="wizard-verify-row" data-state="${state}"><span class="verify-dot"></span><span>${escapeHtml(text)}</span></div>`;
+        box.innerHTML = rows.map(r => row(r.state, r.text)).join("");
+    },
+
+    async _verifyLive(authWarning) {
+        if (this.verifyRan) return;
+        this.verifyRan = true;
+        this._showError("", "verify");
+        this._renderVerify([
+            { state: "run", text: "Contacting Telegram…" },
+            { state: "", text: "Checking Storage Channel…" },
+        ]);
+        document.getElementById("tg-wiz-action-text").textContent = "Verifying…";
+        const btn = document.getElementById("tg-wiz-action");
+        if (btn) btn.disabled = true;
+        try {
+            const res = await apiFetch("/api/telegram/test", { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            const checks = data.checks || {};
+            if (res.ok && data.ok) {
+                this._renderVerify([
+                    { state: "ok", text: "Authentication valid" },
+                    { state: "ok", text: "Storage Channel reachable" },
+                    { state: "ok", text: "Session stored on this server" },
+                ]);
+                // A stale wizard-side warning (e.g. best-effort storage error
+                // from the auth goroutine) must not override a live probe that
+                // just passed: the probe is the fresher fact.
+                this._finish("");
+                return;
+            }
+            const rows = [
+                { state: checks.authentication ? "ok" : "bad", text: checks.authentication ? "Authentication valid" : "Authentication failed" },
+                { state: checks.storage_channel ? "ok" : "bad", text: checks.storage_channel ? "Storage Channel reachable" : "Storage Channel unreachable" },
+                { state: checks.session_persisted ? "ok" : "bad", text: checks.session_persisted ? "Session stored on this server" : "Session not saved yet" },
+            ];
+            this._renderVerify(rows);
+            this._showError(data.message || authWarning || "Storage is not ready yet. Fix the failed check, then press Verify Storage again.", "verify");
+            document.getElementById("tg-wiz-action-text").textContent = "Retry Verify";
+            if (btn) btn.disabled = false;
+        } catch (e) {
+            this._renderVerify([{ state: "bad", text: "Live probe failed: " + (e.message || "network error") }]);
+            this._showError(e.message || "Network error", "verify");
+            document.getElementById("tg-wiz-action-text").textContent = "Retry Verify";
+            if (btn) btn.disabled = false;
+        }
+    },
+
     _finish(errMsg) {
         this._stopPolling();
-        document.querySelectorAll('.wizard-step').forEach(n => { n.classList.remove("active"); n.classList.add("done"); });
-        document.querySelectorAll('.wizard-step-line').forEach(n => n.classList.add("done"));
+        this._clearResendTimer();
+        document.querySelectorAll('#tg-wizard-modal .wizard-step').forEach(n => { n.classList.remove("active"); n.classList.add("done"); });
+        document.querySelectorAll('#tg-wizard-modal .wizard-step-line').forEach(n => n.classList.add("done"));
         this._setPane("done");
         if (errMsg) {
-            // Auth succeeded but the Storage Channel could not be verified.
-            // Stay honest: Telegram is NOT connected — offer retry/sync.
             const icon = document.getElementById("tg-wiz-done-icon");
             const title = document.getElementById("tg-wiz-done-title");
             if (icon) icon.innerHTML = getIcon("alert-circle", "icon-xl").replace('class="icon icon-xl"', 'class="icon icon-xl" style="color: var(--warning);"');
-            if (title) title.textContent = "Signed in — storage not ready";
+            if (title) title.textContent = "Signed in \u2014 storage not ready";
             document.getElementById("tg-wiz-done-msg").textContent =
-                "Signed in, but storage is not ready: " + errMsg + " Fix this in Settings → Telegram Storage, then Sync.";
+                "Signed in, but storage is not ready: " + errMsg + " Fix this in Settings, then Sync.";
             document.getElementById("tg-wiz-action-text").textContent = "Review Storage";
             showToast("Signed in, but Storage Channel is not ready", "error");
         } else {
@@ -4156,11 +4294,10 @@ const TgWizard = {
             if (icon) icon.innerHTML = getIcon("check", "icon-xl").replace('class="icon icon-xl"', 'class="icon icon-xl" style="color: var(--success);"');
             if (title) title.textContent = "Telegram paired!";
             document.getElementById("tg-wiz-done-msg").textContent =
-                "Authentication succeeded — Storage Channel bound automatically.";
+                "Live probe passed \u2014 Storage Channel answered. tDocs is ready to store files.";
             document.getElementById("tg-wiz-action-text").textContent = "All Set";
             showToast("Telegram paired successfully", "success");
         }
-        // Refresh status / banner / folders
         refreshStatus();
         checkTelegramSetup();
     },
@@ -4171,23 +4308,96 @@ const TgWizard = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: this.id, ...payload })
         });
-        return res.json().catch(() => ({ ok: false, error: "bad response" }));
+        const raw = await res.text().catch(() => "");
+        try {
+            const data = raw ? JSON.parse(raw) : {};
+            if (typeof data.ok !== "boolean") data.ok = res.ok;
+            return data;
+        } catch (_) {
+            return { ok: false, error: raw || ("Server returned HTTP " + res.status) };
+        }
     },
 
+    async _cancelCurrent() {
+        if (!this.id) return;
+        // Stop polling before the server drops the wizard: a status poll that
+        // lands after the cancel reports "not_found" and would bounce the UI
+        // back to the phone pane mid-resend.
+        this._stopPolling();
+        try {
+            await apiFetch("/api/telegram/wizard/cancel", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: this.id })
+            });
+        } catch (_) {
+        }
+        this.id = null;
+    },
+
+    async resend() {
+        if (!this.phone) {
+            const el = document.getElementById("tg-wiz-phone");
+            this.phone = (el && el.value.trim()) || "";
+        }
+        if (!this.phone) { this._showError("Enter your Telegram phone number first.", "code"); return; }
+        await this._cancelCurrent();
+        this._showError("", "code");
+        const btn = document.getElementById("tg-wiz-resend");
+        if (btn) btn.disabled = true;
+        try {
+            const res = await apiFetch("/api/telegram/wizard/start", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: this.phone })
+            });
+            const raw = await res.text().catch(() => "");
+            let data = {};
+            try { data = raw ? JSON.parse(raw) : {}; } catch (_) { data = raw ? { error: raw } : {}; }
+            if (!res.ok || !data.id) {
+                const hint = data.hint || data.error || data.message;
+                this._showError(hint ? (data.error && data.hint ? `${data.error} ${data.hint}` : hint) : ("Server returned HTTP " + res.status), "code");
+                this._tickResend();
+                return;
+            }
+            this.id = data.id;
+            const phase = data.phase || data.status || "sending_code";
+            if (data.success || phase === "done") {
+                this._setSteps(["phone", "code", "password", "verify"], 3);
+                this._setStep("verify");
+                this._setPane("verify");
+                this._verifyRanReset();
+                this._verifyLive(data.error || "");
+                return;
+            }
+            this._startResendTimer();
+            this._startPoll();
+            showToast("Fresh login code sent", "success");
+        } catch (e) {
+            this._showError(e.message || "Network error", "code");
+        }
+    },
+
+    _verifyRanReset() { this.verifyRan = false; },
+
     async action() {
-        // Detect current pane by visibility, fall back to step indicator.
-        const panes = Array.from(document.querySelectorAll('.wizard-pane'));
+        const modal = document.getElementById("tg-wizard-modal");
+        const panes = Array.from(modal.querySelectorAll('.wizard-pane'));
         const visible = panes.find(p => p.style.display !== "none") || panes.find(p => p.dataset.pane === "phone");
         const pane = visible?.dataset?.pane;
         if (!pane) return;
-        this._showError("");
+        this._showError("", pane);
 
         if (pane === "phone") {
             const phone = document.getElementById("tg-wiz-phone").value.trim();
-            if (!phone) { this._showError("Enter your Telegram phone number."); return; }
+            if (!phone) { this._showError("Enter your Telegram phone number.", "phone"); return; }
+            if (!/^\+?[0-9][0-9\s().-]{5,}$/.test(phone)) {
+                this._showError("Use the full international format, e.g. +628123456789.", "phone");
+                return;
+            }
             const btn = document.getElementById("tg-wiz-action");
             if (btn) btn.disabled = true;
-            document.getElementById("tg-wiz-action-text").textContent = "Sending…";
+            document.getElementById("tg-wiz-action-text").textContent = "Sending\u2026";
             try {
                 const res = await apiFetch("/api/telegram/wizard/start", {
                     method: "POST",
@@ -4202,52 +4412,65 @@ const TgWizard = {
                     data = raw ? { error: raw } : {};
                 }
                 if (!res.ok || !data.id) {
-                    this._showError(data.hint || data.error || data.message || ("Server returned HTTP " + res.status));
+                    const hint = data.hint || data.error || data.message;
+                    this._showError(hint ? (data.error && data.hint ? `${data.error} ${data.hint}` : hint) : ("Server returned HTTP " + res.status), "phone");
                     document.getElementById("tg-wiz-action-text").textContent = "Send Code";
                     if (btn) btn.disabled = false;
                     return;
                 }
                 this.id = data.id;
-                // Do not assume the code pane: the backend may report the
-                // wizard already finished (session still valid) or failed
-                // before sending anything. Trust the returned phase.
+                this.phone = phone;
                 const phase = data.phase || data.status || "sending_code";
                 if (btn) btn.disabled = false;
                 if (data.success || phase === "done") {
-                    this._finish(data.error || "");
+                    this._setSteps(["phone", "code", "password", "verify"], 3);
+                    this._setStep("verify");
+                    this._setPane("verify");
+                    this._verifyRanReset();
+                    this._verifyLive(data.error || "");
                     return;
                 }
                 if (phase === "error") {
-                    this._showError(data.error || "Wizard failed to start");
+                    this._showError(data.error || "Wizard failed to start", "phone");
                     document.getElementById("tg-wiz-action-text").textContent = "Send Code";
                     return;
                 }
                 this._setStep("code");
                 this._setPane("code");
-                document.getElementById("tg-wiz-action-text").textContent = "Verify Code";
+                this._startResendTimer();
                 this._startPoll();
             } catch (e) {
-                this._showError(e.message || "Network error");
+                this._showError(e.message || "Network error", "phone");
                 document.getElementById("tg-wiz-action-text").textContent = "Send Code";
-                if (btn) btn.disabled = false;
+                const btn2 = document.getElementById("tg-wiz-action");
+                if (btn2) btn2.disabled = false;
             }
         } else if (pane === "code") {
             const code = document.getElementById("tg-wiz-code").value.trim();
-            if (!code) { this._showError("Enter the verification code from Telegram."); return; }
+            if (!code) { this._showError("Enter the verification code from Telegram.", "code"); return; }
             const data = await this._submit({ code });
-            if (!data.ok) { this._showError(data.error || "Could not submit code"); return; }
+            if (!data.ok) {
+                this._showError(data.hint ? `${data.error} ${data.hint}` : (data.error || "Could not submit code"), "code");
+                return;
+            }
             document.getElementById("tg-wiz-code").value = "";
-            // Stay on this pane: only the backend knows whether 2FA is needed.
-            // Polling advances to "password" when Telegram asks for it.
             this._startPoll();
         } else if (pane === "password") {
             const password = document.getElementById("tg-wiz-password").value;
-            if (!password) { this._showError("Enter your 2FA cloud password."); return; }
+            if (!password) { this._showError("Enter your 2FA cloud password.", "password"); return; }
             const data = await this._submit({ password });
             document.getElementById("tg-wiz-password").value = "";
-            if (!data.ok) { this._showError(data.error || "Could not submit password"); return; }
-            this._setStep("done");
-            this._finish("");
+            if (!data.ok) {
+                this._showError(data.hint ? `${data.error} ${data.hint}` : (data.error || "Could not submit password"), "password");
+                return;
+            }
+            this._setStep("verify");
+            this._setPane("verify");
+            this._verifyRanReset();
+            this._verifyLive("");
+        } else if (pane === "verify") {
+            this._verifyRanReset();
+            this._verifyLive("");
         } else if (pane === "done") {
             this.close();
         }
@@ -4257,6 +4480,7 @@ const TgWizard = {
 function openTelegramWizard() { TgWizard.open(); }
 function closeTelegramWizard() { TgWizard.close(); }
 function wizardAction() { TgWizard.action(); }
+function wizardResend() { TgWizard.resend(); }
 
 async function checkTelegramSetup() {
     await refreshTelegramState(false);

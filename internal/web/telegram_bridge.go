@@ -38,6 +38,12 @@ func (s *Server) discardWebWizard(id string) {
 	telegram.WizardDiscard(id)
 }
 
+// cancelWebWizard abandons an in-flight wizard so a fresh code request starts
+// from a clean phase instead of "wizard is not waiting for that input".
+func (s *Server) cancelWebWizard(id string) {
+	telegram.WizardCancel(id)
+}
+
 // telegramAuthorized reports whether the paired Telegram account is
 // currently authenticated (used by the setup-wizard banner).
 func (s *Server) telegramAuthorized() bool {

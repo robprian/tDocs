@@ -219,11 +219,11 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	_, authErr := s.db.GetSetting("telegram_authorized")
 	_, chanIDErr := s.db.GetSetting("storage_channel_id")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"version":             "2.0.0",
-		"uptime_seconds":      int64(time.Since(s.startedAt).Seconds()),
+		"version":             s.currentVersion(),
 		"goroutines":          runtime.NumGoroutine(),
 		"memory_alloc_bytes":  mem.Alloc,
 		"db_bytes":            dbFileSize(s.cfg.DBPath),
+		"uptime_seconds":      int64(time.Since(s.startedAt).Seconds()),
 		"telegram_session":    sessErr == nil,
 		"telegram_authorized": authErr == nil,
 		"storage_channel":     chanIDErr == nil,

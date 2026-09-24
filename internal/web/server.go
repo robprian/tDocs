@@ -208,6 +208,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/telegram/wizard/status", s.superuserOnly(s.handleTelegramWizardStatus))
 	s.mux.HandleFunc("POST /api/telegram/wizard/submit", s.superuserOnly(s.handleTelegramWizardSubmit))
 	s.mux.HandleFunc("POST /api/telegram/wizard/discard", s.superuserOnly(s.handleTelegramWizardDiscard))
+	s.mux.HandleFunc("POST /api/telegram/wizard/cancel", s.superuserOnly(s.handleTelegramWizardCancel))
 	s.mux.HandleFunc("GET /api/telegram/wizard/needed", s.superuserOnly(s.handleTelegramWizardNeeded))
 	s.mux.HandleFunc("POST /api/telegram/onboard", s.superuserOnly(s.handleTelegramWizardStart)) // alias
 	// Verified backend state + explicit live connection test (superuser only).
@@ -388,7 +389,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	_ = s.templates.ExecuteTemplate(w, "index.html", nil)
+	_ = s.templates.ExecuteTemplate(w, "index.html", map[string]any{
+		"Version": s.currentVersion(),
+	})
 }
 
 // StartPeriodicBackup starts a background scheduler that creates and uploads

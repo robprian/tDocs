@@ -155,8 +155,7 @@
 
 
             <div class="sidebar-foot">
-                <div><strong>tDocs v2.0.0</strong> &bull; MIT License</div>
-                <div>Created by <a href="https://github.com/robprian" target="_blank" rel="noopener noreferrer">Robby Aprianto</a></div>
+                <div><strong>tDocs {{.Version}}</strong> &bull; MIT License</div>
                 <div><a href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted);">GitHub</a> &bull; <a href="/docs" style="color: var(--text-muted);">API Docs</a> &bull; <a href="/api/openapi.json" style="color: var(--text-muted);">OpenAPI</a></div>
             </div>
         </aside>
@@ -165,7 +164,7 @@
         <main class="content-area">
 
             <!-- Setup Wizard Banner (only when Telegram not yet paired) -->
-            <div id="telegram-setup-banner" class="wizard-banner" style="display: none;">
+            <div id="telegram-setup-banner" class="wizard-banner" role="status" aria-live="polite" style="display: none;">
                 <div class="wizard-banner-icon">
                     <svg class="icon icon-lg" viewBox="0 0 24 24" style="color: var(--primary);"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 15L22 2Z"/></svg>
                 </div>
@@ -199,8 +198,8 @@
                     <div class="overview-main">
                         <div class="welcome-banner">
                             <div class="welcome-copy">
-                                <span class="welcome-kicker">Good morning,</span>
-                                <h1>Welcome back, Robby!</h1>
+                                <span class="welcome-kicker" id="ov-greeting-kicker">Welcome</span>
+                                <h1 id="ov-greeting-title">Your library at a glance</h1>
                                 <p>Your files are safe and always accessible.</p>
                             </div>
                             <div class="welcome-art" aria-hidden="true">
@@ -219,6 +218,8 @@
                                 </svg>
                             </div>
                         </div>
+
+                        <div id="ov-stat-cards" class="stat-cards" aria-live="polite" aria-label="Library metrics"></div>
 
                         <div id="ov-folders-section" style="display: none;">
                             <div class="section-header">
@@ -283,11 +284,11 @@
                         <div class="rail-card">
                             <div class="rail-card-head">
                                 <span class="rail-card-title">Telegram</span>
-                                <span id="tg-state-pill" class="tg-state-pill">Checking…</span>
+                                <span id="tg-state-pill" class="tg-state-pill" role="status" aria-live="polite">Checking…</span>
                             </div>
                             <div class="rail-row">
                                 <span class="status-dot" id="status-dot"></span>
-                                <span id="status-label" class="rail-row-main">Checking…</span>
+                                <span id="status-label" class="rail-row-main" aria-live="polite">Checking…</span>
                             </div>
                             <div class="rail-kv">
                                 <div class="rail-kv-row"><span>Storage Channel</span><strong id="status-channel">—</strong></div>
@@ -337,9 +338,6 @@
                     </aside>
                 </div>
 
-                <!-- Stat cards kept out of the reference composition; the numbers
-                     already appear in the rail, so the node stays hidden. -->
-                <div id="ov-stat-cards" class="stat-cards" hidden></div>
             </div>
 
             <!-- Drive Content Tab -->
@@ -672,19 +670,19 @@
     </div>
 
     <!-- Telegram Setup Wizard Modal -->
-    <div id="tg-wizard-modal" class="modal-overlay">
-        <div class="modal-dialog" style="max-width: 520px;">
+    <div id="tg-wizard-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tg-wiz-title">
+        <div class="modal-dialog tg-wizard-dialog" style="max-width: 560px;">
             <div class="modal-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 44px; height: 44px; border-radius: 14px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: #fff;">
                         <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 15L22 2Z"/></svg>
                     </div>
                     <div>
-                        <h3 class="modal-title">Connect Telegram</h3>
-                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">Pair tDocs with your Telegram account in three quick steps.</p>
+                        <h3 class="modal-title" id="tg-wiz-title">Connect Telegram</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">Pair tDocs with your Telegram account in four quick steps.</p>
                     </div>
                 </div>
-                <button class="btn-icon" onclick="closeTelegramWizard()" title="Close">
+                <button class="btn-icon" onclick="closeTelegramWizard()" title="Close" aria-label="Close setup wizard">
                     <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
@@ -705,6 +703,11 @@
                     <span class="wizard-step-num">3</span>
                     <span class="wizard-step-label">2FA (if any)</span>
                 </div>
+                <div class="wizard-step-line"></div>
+                <div class="wizard-step" data-step="verify">
+                    <span class="wizard-step-num">4</span>
+                    <span class="wizard-step-label">Verify storage</span>
+                </div>
             </div>
 
             <!-- Wizard body -->
@@ -718,7 +721,7 @@
                         <label class="form-label">Phone number</label>
                         <input type="tel" id="tg-wiz-phone" class="form-input" placeholder="+1 555 123 4567" autocomplete="tel" autofocus>
                     </div>
-                    <div id="tg-wiz-error" class="wizard-error" style="display: none;"></div>
+                    <div class="wizard-error" data-error style="display: none;"></div>
                 </div>
 
                 <!-- Code step -->
@@ -728,8 +731,13 @@
                     </p>
                     <div class="form-group">
                         <label class="form-label">Verification code</label>
-                        <input type="text" id="tg-wiz-code" class="form-input" maxlength="8" placeholder="12345" inputmode="numeric" autocomplete="one-time-code">
+                        <input type="text" id="tg-wiz-code" class="form-input" maxlength="8" placeholder="12345" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" aria-describedby="tg-wiz-resend-text">
                     </div>
+                    <div class="wizard-resend">
+                        <span class="wizard-resend-text" id="tg-wiz-resend-text">Didn't get the code? Check your Telegram app first.</span>
+                        <button type="button" class="btn btn-secondary btn-sm" id="tg-wiz-resend" onclick="wizardResend()" disabled>Resend code</button>
+                    </div>
+                    <div class="wizard-error" data-error style="display: none;"></div>
                 </div>
 
                 <!-- Password step -->
@@ -741,6 +749,16 @@
                         <label class="form-label">2FA Cloud Password</label>
                         <input type="password" id="tg-wiz-password" class="form-input" autocomplete="current-password">
                     </div>
+                    <div class="wizard-error" data-error style="display: none;"></div>
+                </div>
+
+                <!-- Verify step: a real end-to-end probe, not a config check -->
+                <div class="wizard-pane" data-pane="verify" style="display: none;">
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 14px;">
+                        Running a live connection test against your Telegram Storage Channel. This must pass before tDocs claims storage is ready.
+                    </p>
+                    <div id="tg-wiz-verify-list" class="wizard-verify-list" role="status" aria-live="polite"></div>
+                    <div class="wizard-error" data-error style="display: none;"></div>
                 </div>
 
                 <!-- Done step -->

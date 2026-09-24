@@ -108,14 +108,12 @@ func (m *ClientManager) Run(ctx context.Context, f func(ctx context.Context) err
 	}()
 
 	return m.client.Run(ctx, func(runCtx context.Context) error {
-		// Service dispatched request-scoped calls concurrently with the
-		// caller's own setup callback (e.g. EnsureStorageChannel).
-		taskDone := make(chan struct{})
-		go func() {
-			defer close(taskDone)
-			m.serveTasks(runCtx)
-		}()
-		defer func() { <-taskDone }()
+		// serveTasks must NOT be waited on here: gotd only cancels runCtx
+		// AFTER this callback returns, so `defer <-taskDone` deadlocks
+		// forever (login hung after "Channel sync" with no Paired banner).
+		// Fire-and-forget is safe: serveTasks exits on its own when gotd
+		// cancels runCtx right after we return.
+		go m.serveTasks(runCtx)
 		return f(runCtx)
 	})
 }

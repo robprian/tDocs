@@ -199,6 +199,58 @@ func ownedByRPM(path string) bool {
 	return exec.CommandContext(ctx, "rpm", "-qf", path).Run() == nil
 }
 
+// PackageName returns the release artifact for a package install kind
+// (deb/rpm) on a GOARCH, matching scripts/package-{deb,rpm}.sh naming:
+// tdocs_<ver>_<debarch>.deb / tdocs_<ver>_<rpmarch>.rpm.
+// ok=false when the arch has no published package (caller falls back).
+func PackageName(kind, version, goarch string) (string, bool) {
+	ver := strings.TrimPrefix(version, "v")
+	var arch string
+	var ext string
+	switch kind {
+	case InstallDeb:
+		var ok bool
+		arch, ok = map[string]string{
+			"amd64": "amd64", "arm64": "arm64", "386": "i386",
+			"arm": "armhf", "ppc64le": "ppc64el", "s390x": "s390x",
+		}[goarch]
+		if !ok {
+			return "", false
+		}
+		ext = "deb"
+	case InstallRPM:
+		var ok bool
+		arch, ok = map[string]string{
+			"amd64": "x86_64", "arm64": "aarch64", "386": "i686",
+			"arm": "armv7hl", "ppc64le": "ppc64le", "s390x": "s390x",
+		}[goarch]
+		if !ok {
+			return "", false
+		}
+		ext = "rpm"
+	default:
+		return "", false
+	}
+	return fmt.Sprintf("tdocs_%s_%s.%s", ver, arch, ext), true
+}
+
+// PackageManager returns the install command prefix for a package kind
+// ("dnf" preferred, "yum"/"zypper"/"rpm -U" fallback for rpm).
+func PackageManager(kind string) (string, []string) {
+	if kind == InstallDeb {
+		return "apt", []string{"install"}
+	}
+	for _, c := range []struct {
+		bin  string
+		args []string
+	}{{"dnf", []string{"upgrade", "-y"}}, {"yum", []string{"upgrade", "-y"}}, {"zypper", []string{"install", "-y"}}, {"rpm", []string{"-Uvh"}}} {
+		if _, err := exec.LookPath(c.bin); err == nil {
+			return c.bin, c.args
+		}
+	}
+	return "dnf", []string{"upgrade", "-y"}
+}
+
 // TarballName is the release artifact for a linux GOARCH. GOARCH arm ships
 // as armv7 (GOARM=7 build); every other key is the artifact suffix verbatim.
 func TarballName(version, goarch string) (string, bool) {
@@ -215,27 +267,22 @@ func TarballName(version, goarch string) (string, bool) {
 
 // UpgradeHint returns the exact command a human should run for this install
 // kind. version is the release tag ("v2.1.1"), goarch is runtime.GOARCH.
+// Names come from PackageName so the hint can never drift from real artifacts.
+// The rpm hint is canonically `dnf upgrade`: PackageManager (used by the
+// auto-install path) resolves the real binary at runtime, but the hint must
+// stay deterministic across hosts.
 func UpgradeHint(kind, version, goarch string) string {
-	ver := strings.TrimPrefix(version, "v")
 	switch kind {
 	case InstallDeb:
-		debArch, ok := map[string]string{
-			"amd64": "amd64", "arm64": "arm64", "386": "i386",
-			"arm": "armhf", "ppc64le": "ppc64el", "s390x": "s390x",
-		}[goarch]
-		if !ok {
-			return "tdocs update"
+		if name, ok := PackageName(InstallDeb, version, goarch); ok {
+			return fmt.Sprintf("sudo apt update && sudo apt install ./%s", name)
 		}
-		return fmt.Sprintf("sudo apt update && sudo apt install ./tdocs_%s_%s.deb", ver, debArch)
+		return "tdocs update"
 	case InstallRPM:
-		rpmArch, ok := map[string]string{
-			"amd64": "x86_64", "arm64": "aarch64", "386": "i686",
-			"arm": "armv7hl", "ppc64le": "ppc64le", "s390x": "s390x",
-		}[goarch]
-		if !ok {
-			return "tdocs update"
+		if name, ok := PackageName(InstallRPM, version, goarch); ok {
+			return fmt.Sprintf("sudo dnf upgrade ./%s", name)
 		}
-		return fmt.Sprintf("sudo dnf upgrade ./tdocs_%s_%s.rpm", ver, rpmArch)
+		return "tdocs update"
 	case InstallSource:
 		return "git pull && make build"
 	default:

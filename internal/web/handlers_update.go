@@ -99,9 +99,12 @@ func (s *Server) updateSnapshot() updateSnapshot {
 	s.updateMu.Unlock()
 
 	if rel != nil {
-		snap.Latest = rel.Tag
 		snap.CheckedAt = checkedAt.UTC().Format(time.RFC3339)
 		if app.IsNewer(current, rel.Tag) {
+			// Latest is only advertised when it is genuinely newer: a release
+			// equal to the running build must never surface as something to
+			// install, on any client.
+			snap.Latest = rel.Tag
 			snap.Available = true
 			snap.URL = app.ReleaseURL(rel.Tag)
 			snap.Hint = app.UpgradeHint(snap.InstallKind, rel.Tag, runtime.GOARCH)

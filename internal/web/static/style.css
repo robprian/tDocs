@@ -669,6 +669,8 @@ textarea.form-input { height: auto; padding: 9px 11px; resize: vertical; }
 /* --------------------------------------------------------- stat cards --- */
 
 .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+#ov-stat-cards { margin-bottom: 18px; }
+#ov-stat-cards .stat-card { min-width: 0; }
 
 .stat-card {
   background: var(--bg-surface);
@@ -689,6 +691,9 @@ textarea.form-input { height: auto; padding: 9px 11px; resize: vertical; }
   font-variant-numeric: tabular-nums; color: var(--text-primary);
 }
 .stat-sub { font-size: 0.75rem; color: var(--text-muted); }
+.stat-note { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.stat-health-ok { color: var(--success); font-weight: 650; }
+.stat-health-bad { color: var(--danger); font-weight: 650; }
 
 .stat-card-hero {
   background: var(--primary-gradient);
@@ -1173,6 +1178,14 @@ th.sortable:hover { color: var(--text-secondary); }
   background: var(--danger-soft); color: var(--danger);
   border-radius: var(--radius-md); padding: 9px 12px; font-size: 0.8rem; margin-top: 10px;
 }
+.wizard-resend { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.wizard-resend-text { font-size: 0.76rem; color: var(--text-muted); flex: 1 1 200px; }
+.wizard-verify-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.wizard-verify-row { display: flex; align-items: center; gap: 9px; font-size: 0.84rem; padding: 9px 11px; border: 1px solid var(--border-soft); border-radius: var(--radius-md); background: var(--bg-raised); }
+.wizard-verify-row .verify-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.wizard-verify-row[data-state="ok"] .verify-dot { background: var(--success); }
+.wizard-verify-row[data-state="bad"] .verify-dot { background: var(--danger); }
+.wizard-verify-row[data-state="run"] .verify-dot { background: var(--primary); animation: pulse-dot 1s ease-in-out infinite; }
 .wizard-success { text-align: center; padding: 14px 0; }
 .wizard-success-icon {
   width: 52px; height: 52px; margin: 0 auto; border-radius: 50%;
@@ -1328,7 +1341,8 @@ body.auth-page {
   .data-table tbody td, .data-table thead th { padding: 8px 10px; }
   .toast-container { left: 12px; right: 12px; bottom: 12px; max-width: none; }
   .upload-drawer { right: 10px; left: 10px; width: auto; bottom: 10px; }
-  .details-drawer { width: 100vw; }
+  .details-drawer { width: min(100vw, 400px); max-width: 100vw; }
+  .btn:not(.btn-sm):not(.btn-icon) { min-height: 42px; }
   .wizard-banner { flex-wrap: wrap; align-items: flex-start; }
   .wizard-banner-body { flex: 1 1 calc(100% - 50px); }
   .wizard-banner > .btn { flex: 1 1 100%; }
@@ -1348,9 +1362,20 @@ body.auth-page {
   .mini-player.mp-min .mp-extra .btn-icon.mp-min-only { display: inline-flex; }
 }
 
+.tg-wizard-dialog:focus-within { outline: none; }
+@media (max-width: 640px) {
+  #tg-wizard-modal { padding: 0; align-items: flex-end; }
+  .tg-wizard-dialog { max-width: none; width: 100%; border-radius: 18px 18px 0 0; max-height: 94vh; }
+  .wizard-stepper { gap: 6px; }
+  .wizard-step { font-size: 0.72rem; }
+}
 @media (max-width: 430px) {
   .stat-cards { grid-template-columns: minmax(0, 1fr); }
+  #ov-stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .header-actions .btn-icon { width: 30px; height: 30px; }
+  .wizard-step-label { display: none; }
+  .tg-wizard-dialog { border-radius: 16px 16px 0 0; }
+  .wizard-resend .btn { width: 100%; }
 }
 
 /* ---------------------------------------------- reference composition --- */
@@ -1677,6 +1702,14 @@ body.auth-page {
   .mini-player.mp-min { left: 10px; bottom: 10px; flex-wrap: nowrap; }
 }
 
+/* Tiny phones: one column everywhere + step progress stays readable. */
+@media (max-width: 360px) {
+  .folder-grid, #ov-stat-cards { grid-template-columns: minmax(0, 1fr); }
+  .modal-footer { flex-direction: column-reverse; align-items: stretch; }
+  .modal-footer .btn { width: 100%; }
+  .table-container { overflow-x: auto; }
+  .data-table { min-width: 560px; }
+}
 /* Phones: recent table collapses to name + actions. */
 @media (max-width: 560px) {
   .layout-shell { padding: 0 10px; }

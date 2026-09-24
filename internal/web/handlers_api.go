@@ -92,9 +92,8 @@ func (s *Server) handleAPIIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"name":     "tDocs API",
-		"version":  "2.0.0",
-		"base_url": base,
+		"name":    "tDocs API",
+		"version": s.currentVersion(),
 		"auth": map[string]string{
 			"dashboard": "cookie tdocs_session=authenticated (POST /login)",
 			"machine":   "Authorization: Bearer <TDOCS_ADMIN_PASSWORD> or ?api_key=<password>",
@@ -126,9 +125,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	state, detail := s.telegramState(r.Context(), false)
 	last := s.lastTelegramHealth()
 
-	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"version":              "2.0.0",
+		"version":              s.currentVersion(),
 		"telegram_session":     sessErr == nil,
 		"telegram_authorized":  authErr == nil,
 		"telegram_connected":   state == TgConnected,

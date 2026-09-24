@@ -6,7 +6,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"tdocs/internal/app"
 	"tdocs/internal/db"
@@ -186,17 +185,6 @@ func currentUsername() string {
 		return u.Username
 	}
 	return fmt.Sprintf("uid %d", os.Geteuid())
-}
-
-func ownerSuffix(fi os.FileInfo) string {
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		return ""
-	}
-	if u, err := user.LookupId(fmt.Sprint(st.Uid)); err == nil {
-		return fmt.Sprintf(" (milik %s, mode %#o)", u.Username, fi.Mode().Perm())
-	}
-	return fmt.Sprintf(" (milik uid %d, mode %#o)", st.Uid, fi.Mode().Perm())
 }
 
 func isSystemPath(p string) bool {
