@@ -61,30 +61,29 @@ run: build
 
 ## Release (developers/CI only — users install packages) ---------------------
 
-# Build static binaries for all supported Linux architectures into dist/linux/.
-release:
-	scripts/build-release.sh $(VERSION) dist
+# Published architecture: only linux/amd64 is packaged for releases. Other
+# architectures build from source with `make build`.
+PUBLISH_ARCH := amd64
 
-# Universal tarball for the host architecture (or ARCH=arm64 make package-tar).
+# Build the static release binary into dist/linux/.
+release:
+	scripts/build-release.sh $(VERSION) dist $(PUBLISH_ARCH)
+
+# Universal tarball for the published architecture.
 ARCH ?= $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/' -e 's/armv7l/armv7/')
 package-tar: release
 	scripts/package-tar.sh $(VERSION) $(ARCH)
 
 package-deb: release
-	scripts/package-deb.sh $(VERSION) amd64
-	scripts/package-deb.sh $(VERSION) arm64
+	scripts/package-deb.sh $(VERSION) $(PUBLISH_ARCH)
 
 package-rpm: release
-	scripts/package-rpm.sh $(VERSION) amd64
-	scripts/package-rpm.sh $(VERSION) arm64
+	scripts/package-rpm.sh $(VERSION) $(PUBLISH_ARCH)
 
 package-all: release
-	scripts/package-tar.sh $(VERSION) amd64
-	scripts/package-tar.sh $(VERSION) arm64
-	scripts/package-deb.sh $(VERSION) amd64
-	scripts/package-deb.sh $(VERSION) arm64
-	scripts/package-rpm.sh $(VERSION) amd64
-	scripts/package-rpm.sh $(VERSION) arm64
+	scripts/package-tar.sh $(VERSION) $(PUBLISH_ARCH)
+	scripts/package-deb.sh $(VERSION) $(PUBLISH_ARCH)
+	scripts/package-rpm.sh $(VERSION) $(PUBLISH_ARCH)
 	$(MAKE) checksums
 
 checksums:

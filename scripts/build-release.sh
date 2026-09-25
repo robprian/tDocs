@@ -5,14 +5,16 @@
 #   scripts/build-release.sh <version> [outdir]
 #
 # Environment:
-#   TDOCS_ARCHES   space-separated GOARCH values (default: "amd64 arm64 arm 386 ppc64le s390x")
+#   TDOCS_ARCHES   space-separated GOARCH values (default: "amd64"; other
+#                  arches build from source but are not published)
 #   TDOCS_OS       GOOS (default: linux)
 set -euo pipefail
 
 VERSION="${1:-dev}"
 OUT="${2:-dist}"
+ARCH_ARG="${3:-}"
 GOOS_TARGET="${TDOCS_OS:-linux}"
-ARCHES="${TDOCS_ARCHES:-amd64 arm64 arm 386 ppc64le s390x}"
+ARCHES="${TDOCS_ARCHES:-${ARCH_ARG:-amd64}}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"

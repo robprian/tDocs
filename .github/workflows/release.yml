@@ -1,11 +1,16 @@
 name: Release
 
 # Tag-driven production release:
-#   git tag v2.1.0 && git push origin v2.1.0
+#   git tag v3.0.1 && git push origin v3.0.1
 #
-# Pipeline: validate → build binaries (matrix) → packages (deb/rpm/tar)
+# Pipeline: validate → build binary (linux/amd64) → packages (deb/rpm/tar)
 # → checksums → container smoke tests (Debian/Ubuntu/Rocky/openSUSE)
 # → GitHub Release with generated notes.
+#
+# Only linux/amd64 is published: it is the architecture every supported
+# distro package targets, and a single-artifact matrix keeps the release fast
+# and the packaging surface small. Other architectures build from source
+# (`make build`).
 
 on:
   push:
@@ -76,11 +81,6 @@ jobs:
       matrix:
         include:
           - { goarch: amd64,   dir: amd64,   goarm: "" }
-          - { goarch: arm64,   dir: arm64,   goarm: "" }
-          - { goarch: arm,     dir: armv7,   goarm: "7" }
-          - { goarch: 386,     dir: 386,     goarm: "" }
-          - { goarch: ppc64le, dir: ppc64le, goarm: "" }
-          - { goarch: s390x,   dir: s390x,   goarm: "" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -144,28 +144,16 @@ jobs:
       - name: Build tarballs
         run: |
           V="${{ needs.version.outputs.version }}"
-          for arch in amd64 arm64 armv7 386 ppc64le s390x; do
-            [ -f "dist/linux/$arch/tdocs" ] || continue
-            scripts/package-tar.sh "$V" "$arch"
-          done
+          [ -f "dist/linux/amd64/tdocs" ] || { echo "amd64 binary missing"; exit 1; }
+          scripts/package-tar.sh "$V" amd64
       - name: Build deb packages
         run: |
           V="${{ needs.version.outputs.version }}"
-          # Primary package architectures
           scripts/package-deb.sh "$V" amd64
-          scripts/package-deb.sh "$V" arm64
-          # Additional where the binary exists
-          for ga in 386 arm ppc64le s390x; do
-            [ -f "dist/linux/$ga/tdocs" ] || continue
-            case "$ga" in arm) dir=armv7 ;; *) dir=$ga ;; esac
-            [ -f "dist/linux/$dir/tdocs" ] || continue
-            scripts/package-deb.sh "$V" "$ga" "dist/linux/$dir" || true
-          done
       - name: Build rpm packages
         run: |
           V="${{ needs.version.outputs.version }}"
           scripts/package-rpm.sh "$V" amd64
-          scripts/package-rpm.sh "$V" arm64
       - name: Checksums
         run: scripts/checksums.sh dist
       - name: Release notes
@@ -181,23 +169,18 @@ jobs:
           - systemd service with hardening (\`tdocs service install\`)
           - Embedded dashboard — single executable
 
-          ### Linux downloads
+          ### Linux downloads (x86_64)
 
           **Debian / Ubuntu**
           - \`tdocs_${V}_amd64.deb\`
-          - \`tdocs_${V}_arm64.deb\`
 
           **RHEL / Rocky / Alma / CentOS / Fedora / openSUSE**
           - \`tdocs_${V}_x86_64.rpm\`
-          - \`tdocs_${V}_aarch64.rpm\`
 
           **Universal Linux**
           - \`tdocs_${V}_linux_amd64.tar.gz\`
-          - \`tdocs_${V}_linux_arm64.tar.gz\`
-          - \`tdocs_${V}_linux_armv7.tar.gz\`
-          - \`tdocs_${V}_linux_386.tar.gz\`
-          - \`tdocs_${V}_linux_ppc64le.tar.gz\`
-          - \`tdocs_${V}_linux_s390x.tar.gz\`
+
+          Other architectures build from source (\`make build\`).
 
           **Checksums**
           - \`SHA256SUMS\`

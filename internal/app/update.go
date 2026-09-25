@@ -199,34 +199,28 @@ func ownedByRPM(path string) bool {
 	return exec.CommandContext(ctx, "rpm", "-qf", path).Run() == nil
 }
 
+// publishedGOARCH is the only architecture with release artifacts (see the
+// release workflow and scripts/build-release.sh). Other architectures build
+// from source (git pull && make build), never from a release download.
+const publishedGOARCH = "amd64"
+
 // PackageName returns the release artifact for a package install kind
 // (deb/rpm) on a GOARCH, matching scripts/package-{deb,rpm}.sh naming:
 // tdocs_<ver>_<debarch>.deb / tdocs_<ver>_<rpmarch>.rpm.
 // ok=false when the arch has no published package (caller falls back).
 func PackageName(kind, version, goarch string) (string, bool) {
+	if goarch != publishedGOARCH {
+		return "", false
+	}
 	ver := strings.TrimPrefix(version, "v")
 	var arch string
 	var ext string
 	switch kind {
 	case InstallDeb:
-		var ok bool
-		arch, ok = map[string]string{
-			"amd64": "amd64", "arm64": "arm64", "386": "i386",
-			"arm": "armhf", "ppc64le": "ppc64el", "s390x": "s390x",
-		}[goarch]
-		if !ok {
-			return "", false
-		}
+		arch = "amd64"
 		ext = "deb"
 	case InstallRPM:
-		var ok bool
-		arch, ok = map[string]string{
-			"amd64": "x86_64", "arm64": "aarch64", "386": "i686",
-			"arm": "armv7hl", "ppc64le": "ppc64le", "s390x": "s390x",
-		}[goarch]
-		if !ok {
-			return "", false
-		}
+		arch = "x86_64"
 		ext = "rpm"
 	default:
 		return "", false
@@ -251,18 +245,15 @@ func PackageManager(kind string) (string, []string) {
 	return "dnf", []string{"upgrade", "-y"}
 }
 
-// TarballName is the release artifact for a linux GOARCH. GOARCH arm ships
-// as armv7 (GOARM=7 build); every other key is the artifact suffix verbatim.
+// TarballName is the release artifact for a linux GOARCH. Only amd64 is
+// published (see the release workflow); every other GOARCH builds from
+// source, so lookups return ok=false and callers fall back to a hint.
 func TarballName(version, goarch string) (string, bool) {
-	arch, ok := map[string]string{
-		"amd64": "amd64", "arm64": "arm64", "arm": "armv7",
-		"386": "386", "ppc64le": "ppc64le", "s390x": "s390x",
-	}[goarch]
-	if !ok {
+	if goarch != publishedGOARCH {
 		return "", false
 	}
 	return fmt.Sprintf("tdocs_%s_linux_%s.tar.gz",
-		strings.TrimPrefix(version, "v"), arch), true
+		strings.TrimPrefix(version, "v"), goarch), true
 }
 
 // UpgradeHint returns the exact command a human should run for this install
@@ -272,6 +263,12 @@ func TarballName(version, goarch string) (string, bool) {
 // auto-install path) resolves the real binary at runtime, but the hint must
 // stay deterministic across hosts.
 func UpgradeHint(kind, version, goarch string) string {
+	// No release artifact exists for this architecture, so the only upgrade
+	// path is a source build. Saying "tdocs update" here would send the
+	// operator to a download that 404s.
+	if goarch != publishedGOARCH {
+		return "git pull && make build"
+	}
 	switch kind {
 	case InstallDeb:
 		if name, ok := PackageName(InstallDeb, version, goarch); ok {

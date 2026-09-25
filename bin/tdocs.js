@@ -23,15 +23,10 @@ const PLATFORM_MAP = {
   linux: 'linux'
 };
 
-// Map process.arch to the GOARCH suffix used in published artifact names.
-// GOARCH=arm ships as armv7 (GOARM=7 build) — see scripts/build-release.sh.
+// Only linux/x64 has published release artifacts (see the release
+// workflow). Everything else falls back to a local Go source build.
 const ARCH_MAP = {
-  x64: 'amd64',
-  arm64: 'arm64',
-  ia32: '386',
-  arm: 'armv7',
-  ppc64: 'ppc64le',
-  s390x: 's390x'
+  x64: 'amd64'
 };
 
 // TarballName mirrors internal/app.TarballName: tdocs_<ver>_linux_<arch>.tar.gz

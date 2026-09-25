@@ -45,15 +45,14 @@ case "$(uname -s)" in
   *) echo "✗ This installer targets Linux. Detected: $(uname -s)" >&2; exit 1 ;;
 esac
 
+# Only linux/x86_64 ships release binaries: matches the release workflow and
+# the upgrade hint logic, so users get a clear error instead of a 404.
 ARCH_RAW="$(uname -m)"
 case "$ARCH_RAW" in
   x86_64|amd64) ARCH=amd64 ;;
-  aarch64|arm64) ARCH=arm64 ;;
-  armv7l|armv7) ARCH=armv7 ;;
-  i686|i386) ARCH=386 ;;
-  ppc64le) ARCH=ppc64le ;;
-  s390x) ARCH=s390x ;;
-  *) echo "✗ Unsupported architecture: $ARCH_RAW" >&2; exit 1 ;;
+  *) echo "✗ Only x86_64 has published releases (detected: $ARCH_RAW)." >&2
+     echo "  Build from source: git clone https://github.com/robprian/tDocs && make build" >&2
+     exit 1 ;;
 esac
 
 BIN_SRC="$SCRIPT_DIR/tdocs"

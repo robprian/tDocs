@@ -22,10 +22,10 @@ Grab the latest release: **[github.com/robprian/tDocs/releases](https://github.c
 
 | Your system | Download |
 | :--- | :--- |
-| **Debian / Ubuntu / Mint / Pop!_OS** | `tdocs_<version>_amd64.deb` or `_arm64.deb` |
-| **RHEL / Rocky / Alma / CentOS Stream / Fedora** | `tdocs_<version>_x86_64.rpm` or `_aarch64.rpm` |
+| **Debian / Ubuntu / Mint / Pop!_OS** | `tdocs_<version>_amd64.deb` |
+| **RHEL / Rocky / Alma / CentOS Stream / Fedora** | `tdocs_<version>_x86_64.rpm` |
 | **openSUSE Leap / Tumbleweed / SUSE** | `tdocs_<version>_x86_64.rpm` (RPM format) |
-| **Any Linux (universal)** | `tdocs_<version>_linux_<arch>.tar.gz` |
+| **Any Linux (universal)** | `tdocs_<version>_linux_amd64.tar.gz` |
 
 Verify downloads with `SHA256SUMS` published on the same release page.
 
@@ -201,7 +201,7 @@ sudo install -m 755 ./tdocs-new /usr/bin/tdocs
 sudo systemctl start tdocs
 ```
 
-**Built-in helper** (tarball installs only, amd64/arm64 + checksum verification):
+**Built-in helper** (x86_64 tarball installs only + checksum verification):
 
 ```bash
 tdocs update           # download latest release, verify SHA256, swap binary
