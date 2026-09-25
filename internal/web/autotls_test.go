@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -61,6 +62,11 @@ func TestValidateACMEEmail(t *testing.T) {
 }
 
 func TestDomainStatusAndSave(t *testing.T) {
+	// Unprivileged test ports: the package defaults are 80/443, which CI
+	// runners cannot bind without root. Nothing else reads these helpers'
+	// output, so process-wide overrides are safe here.
+	t.Setenv("TDOCS_HTTP_PORT", "18080")
+	t.Setenv("TDOCS_HTTPS_PORT", "18443")
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	database, err := db.Open(dbPath)
 	if err != nil {
@@ -80,6 +86,7 @@ func TestDomainStatusAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
+	t.Cleanup(func() { server.stopAutoTLS(context.Background()) })
 
 	call := func(method, path, body string) *httptest.ResponseRecorder {
 		var req *http.Request
@@ -126,12 +133,11 @@ func TestDomainStatusAndSave(t *testing.T) {
 		t.Fatalf("unauthenticated domain status: expected 403, got %d", recNoAuth.Code)
 	}
 
-	// Saving a valid domain persists it even when the privileged ports cannot
-	// be bound in the test environment: the setting must survive so a restart
-	// on the real host picks it up.
+	// Saving a valid domain starts the listeners on the unprivileged test
+	// ports and persists the settings.
 	rec = call("POST", "/api/settings/domain", `{"domain":"https://files.example.com/","email":"admin@example.com"}`)
-	if rec.Code != 200 && rec.Code != 500 {
-		t.Fatalf("save: unexpected status %d %s", rec.Code, rec.Body.String())
+	if rec.Code != 200 {
+		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
 	}
 	stored, err := database.GetSetting(settingPublicDomain)
 	if err != nil || stored != "files.example.com" {
