@@ -266,6 +266,9 @@ func runServer(cfg *app.Config) {
 		return
 	}
 
+	// Resume built-in HTTPS when a custom domain was saved in Settings.
+	srv.StartAutoTLSFromSettings(ctx)
+
 	// Start background periodic snapshot scheduler
 	srv.StartPeriodicBackup(ctx)
 

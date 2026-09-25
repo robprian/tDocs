@@ -2581,6 +2581,7 @@ async function loadSettings() {
     loadSessionsList();
     loadTokensList();
     loadAuditLog();
+    loadDomainSettings();
     try {
         const res = await apiFetch("/api/health");
         const h = await res.json();
@@ -2600,6 +2601,91 @@ async function loadSettings() {
     } catch (err) {
         showToast("Health failed: " + err.message, "error");
     }
+}
+
+
+async function loadDomainSettings() {
+    const box = document.getElementById("domain-box");
+    if (!box) return;
+    box.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted);">Loading…</p>';
+    try {
+        const res = await apiFetch("/api/settings/domain");
+        const d = await res.json();
+        const active = !!d.active;
+        const state = !d.domain ? "not set"
+            : active && d.cert_expiry ? "HTTPS active"
+            : active ? "issuing…" : "saved, not running";
+        const stateColor = state === "HTTPS active" ? "var(--success)"
+            : state === "not set" ? "var(--text-muted)" : "var(--warning)";
+        box.innerHTML = `
+            <div class="kv-grid">
+                <dt>Status</dt><dd><span style="color:${stateColor};font-weight:700;">${escapeHtml(state)}</span></dd>
+                ${d.cert_expiry ? `<dt>Certificate</dt><dd>valid until ${escapeHtml(formatDateTime(d.cert_expiry))}</dd>` : ""}
+                ${d.last_error ? `<dt>Last error</dt><dd style="color:var(--danger);">${escapeHtml(d.last_error)}</dd>` : ""}
+                ${d.hint ? `<dt>Next step</dt><dd>${escapeHtml(d.hint)}</dd>` : ""}
+            </div>
+            <div class="form-group" style="margin-top:10px;"><label class="form-label">Public domain</label>
+                <input type="text" id="set-domain" class="form-input" placeholder="files.example.com" value="${escapeHtml(d.domain || "")}" autocomplete="off" spellcheck="false"></div>
+            <div class="form-group"><label class="form-label">Contact email (optional, expiry warnings)</label>
+                <input type="email" id="set-acme-email" class="form-input" placeholder="admin@example.com" value="${escapeHtml(d.email || "")}" autocomplete="email"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-primary" id="domain-save-btn" onclick="saveDomainSettings()">Save & Enable HTTPS</button>
+                ${d.domain ? '<button class="btn btn-secondary" id="domain-retry-btn" onclick="retryDomainSettings()">Retry</button>' : ""}
+                ${d.domain ? '<button class="btn btn-secondary" onclick="clearDomainSettings()">Remove</button>' : ""}
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">Point the domain at this server first (an A/AAAA record), then save. Ports 80 and 443 must be reachable for the automatic certificate.</p>`;
+    } catch (err) {
+        box.innerHTML = `<p style="font-size:0.8rem;color:var(--danger);">Domain status failed: ${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function saveDomainSettings() {
+    return withBtnLoading(document.getElementById("domain-save-btn"), async () => {
+        const domain = document.getElementById("set-domain").value.trim();
+        const email = document.getElementById("set-acme-email").value.trim();
+        const res = await apiFetch("/api/settings/domain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ domain, email })
+        });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            showToast(t || "Save failed", "error");
+            return;
+        }
+        const d = await res.json().catch(() => ({}));
+        if (d.last_error) showToast(d.last_error, "error", 8000);
+        else showToast(domain ? "Domain saved — HTTPS listening for " + domain : "Domain removed — back to plain HTTP", "success");
+        loadDomainSettings();
+    });
+}
+
+async function retryDomainSettings() {
+    return withBtnLoading(document.getElementById("domain-retry-btn"), async () => {
+        const res = await apiFetch("/api/settings/domain/retry", { method: "POST" });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            showToast(t || "Retry failed", "error");
+            return;
+        }
+        showToast("HTTPS restarted, certificate issuing on first visit", "success");
+        loadDomainSettings();
+    });
+}
+
+async function clearDomainSettings() {
+    const res = await apiFetch("/api/settings/domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: "", email: "" })
+    });
+    if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        showToast(t || "Remove failed", "error");
+        return;
+    }
+    showToast("Domain removed — back to plain HTTP", "success");
+    loadDomainSettings();
 }
 
 async function changeAdminPassword() {
@@ -3143,9 +3229,13 @@ const StreamWarmer = {
         if (!id || this.warmed.has(id) || this.inflight.has(id)) return;
         this.inflight.add(id);
         try {
-            const res = await fetch(`/api/files/${id}/stream`, {
+            // no-store on purpose: this only exists to make the backend
+            // resolve the Telegram reference. Letting the 1-byte partial land
+            // in the shared HTTP cache made the media element read a
+            // truncated resource and fail with "cannot play".
+            const res = await apiFetch(`/api/files/${id}/stream`, {
                 headers: { Range: "bytes=0-0" },
-                cache: "force-cache",
+                cache: "no-store",
             });
             // Headers only arrive after the backend resolved the reference.
             if (res.ok || res.status === 206) this.warmed.add(id);
@@ -3174,6 +3264,8 @@ const MediaEngine = {
     repeatMode: "off", // off | all | one
     current: null,
     lastPosSave: 0,
+    gen: 0,        // load generation: stale play()/error events are ignored
+    failed: null,  // ids already reported in this queue (stops the skip loop)
 
     init() {
         if (this.audio) return;
@@ -3189,11 +3281,7 @@ const MediaEngine = {
         a.addEventListener("ended", () => this.onEnded());
         a.addEventListener("play", () => this.paint());
         a.addEventListener("pause", () => this.paint());
-        a.addEventListener("error", () => {
-            const cur = this.current;
-            showToast(`Cannot play ${cur ? cur.name : "audio"}`, "error");
-            this.next(true);
-        });
+        a.addEventListener("error", () => this._mediaError());
         const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         set("mp-shuffle", getIcon("shuffle", "icon-sm"));
         set("mp-repeat", getIcon("repeat", "icon-sm"));
@@ -3248,6 +3336,7 @@ const MediaEngine = {
             return;
         }
         this.queue = list;
+        this.failed = new Set();
         this.playAt(Math.max(0, idx || 0));
     },
 
@@ -3258,9 +3347,16 @@ const MediaEngine = {
         this.current = { id: f.id, name: f.name, mime: f.mime_type, size: f.size, kind: "audio" };
         // The active track is fully buffered; queued neighbours are only
         // resolved, so playlists start instantly without pre-downloading them.
+        this.gen++;
+        const gen = this.gen;
         this.audio.preload = "auto";
         this.audio.src = this.streamUrl(f.id);
-        this.audio.play().catch(() => showToast("Playback blocked by browser", "error"));
+        const p = this.audio.play();
+        // play() rejects (never throws) for two very different reasons:
+        // the browser blocked the gesture, or the stream did not load. Saying
+        // "blocked by browser" for a failed load sent operators hunting a
+        // browser setting that was never the problem.
+        if (p && typeof p.catch === "function") p.catch((err) => this._playFailed(err, gen));
         this.recordRecent(f);
         this.paint();
         this.prefetchNext();
@@ -3269,6 +3365,37 @@ const MediaEngine = {
             bar.style.display = "flex";
             this.applyLayout();
         }
+    },
+
+    // One report per broken track, then skip it. Without the per-id guard the
+    // error event and next() fed each other and machine-gunned the queue.
+    _mediaError() {
+        const cur = this.current;
+        if (!cur) return;
+        const src = this.audio.src || "";
+        if (src && !src.endsWith(this.streamUrl(cur.id))) return; // superseded load
+        this.failed = this.failed || new Set();
+        if (this.failed.has(cur.id)) return;
+        this.failed.add(cur.id);
+        const code = this.audio.error ? this.audio.error.code : 0;
+        const why = code === 2 ? "network error"
+            : code === 3 ? "the file is damaged"
+            : code === 4 ? "this browser cannot play that format" : "";
+        showToast(`Cannot play ${cur.name}${why ? " \u2014 " + why : ""}`, "error", 6000);
+        if (this.queue.length > 1 && this.failed.size < this.queue.length) this.next(true);
+    },
+
+    _playFailed(err, gen) {
+        if (gen !== this.gen) return; // a newer track replaced this request
+        const name = (err && err.name) || "";
+        if (name === "AbortError") return; // superseded by a new load, not a fault
+        if (name === "NotAllowedError") {
+            showToast("Tap Play to start listening", "info");
+            return;
+        }
+        // Load failures also fire the media error event; that path owns the
+        // message so a single bad track cannot produce two toasts.
+        if (!this.audio.error) this._mediaError();
     },
 
     // Resolve the upcoming track ahead of time so "next" starts immediately.

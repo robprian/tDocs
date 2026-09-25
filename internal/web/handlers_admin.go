@@ -212,6 +212,75 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
+func (s *Server) handleDomainStatus(w http.ResponseWriter, r *http.Request) {
+	st := s.autoTLSStatus()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"domain":      st.Domain,
+		"email":       st.Email,
+		"active":      st.Active,
+		"http_port":   st.HTTPPort,
+		"https_port":  st.HTTPSPort,
+		"cert_expiry": st.CertExpiry,
+		"cert_source": st.CertSource,
+		"last_error":  st.LastError,
+		"hint":        st.Hint,
+	})
+}
+
+func (s *Server) handleDomainSave(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Domain string `json:"domain"`
+		Email  string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid payload: need {domain, email?}", http.StatusBadRequest)
+		return
+	}
+	domain, err := ValidateDomain(body.Domain)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	email, err := validateACMEEmail(body.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.applyAutoTLS(r.Context(), domain, email); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if domain == "" {
+		s.audit(r, "domain_clear", "custom domain removed: back to plain HTTP")
+	} else {
+		s.audit(r, "domain_set", domain)
+	}
+	st := s.autoTLSStatus()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"domain":      st.Domain,
+		"email":       st.Email,
+		"active":      st.Active,
+		"http_port":   st.HTTPPort,
+		"https_port":  st.HTTPSPort,
+		"cert_expiry": st.CertExpiry,
+		"cert_source": st.CertSource,
+		"last_error":  st.LastError,
+		"hint":        st.Hint,
+	})
+}
+
+func (s *Server) handleDomainRetry(w http.ResponseWriter, r *http.Request) {
+	domain, _ := s.db.GetSetting(settingPublicDomain)
+	email, _ := s.db.GetSetting(settingACMEEmail)
+	s.restartAutoTLS(r.Context(), domain, email)
+	if err := s.autoTLSError(); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	s.audit(r, "domain_retry", domain)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)

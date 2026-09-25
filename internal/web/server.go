@@ -58,6 +58,11 @@ type Server struct {
 	// Last verified Telegram backend state (never inferred from config alone).
 	tgHealthMu sync.Mutex
 	tgHealth   tgHealthSnapshot
+
+	// Built-in ACME HTTPS (custom domain). Nil when HTTP-only.
+	tlsMu  sync.Mutex
+	tls    *autoTLS
+	tlsErr string
 }
 
 func NewServer(cfg *app.Config, database *db.DB, tgManager *telegram.ClientManager) (*Server, error) {
@@ -164,6 +169,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/sessions", s.authMiddleware(s.handleListSessions))
 	s.mux.HandleFunc("DELETE /api/sessions/{id}", s.authMiddleware(s.handleRevokeSession))
 	s.mux.HandleFunc("POST /api/settings/password", s.authMiddleware(s.handleChangePassword))
+
+	// Public domain + built-in HTTPS (Let's Encrypt via ACME). Superuser-only:
+	// it changes how the appliance is exposed, not just how it looks.
+	s.mux.HandleFunc("GET /api/settings/domain", s.superuserOnly(s.handleDomainStatus))
+	s.mux.HandleFunc("POST /api/settings/domain", s.superuserOnly(s.handleDomainSave))
+	s.mux.HandleFunc("POST /api/settings/domain/retry", s.superuserOnly(s.handleDomainRetry))
 	s.mux.HandleFunc("GET /api/health", s.authMiddleware(s.handleHealth))
 	s.mux.HandleFunc("GET /api/sync/runs", s.authMiddleware(s.handleListSyncRuns))
 	s.mux.HandleFunc("POST /api/storage/verify", s.authMiddleware(s.handleVerifyStorage))

@@ -114,7 +114,7 @@ Need to share a file with someone who doesn't have an account on your server?
 
 #### Step 5b: Sync Center, Settings & API
 - **Sync Center** shows Telegram backend health, every catalog sync run, and one-click recovery.
-- **Settings** lets you change the admin password (Argon2id), manage **API tokens** (for scripts/film sites), inspect **active sessions**, read the **audit log**, and check **system health**.
+- **Settings** lets you change the admin password (Argon2id), manage **API tokens** (for scripts/film sites), inspect **active sessions**, set your **public domain with automatic HTTPS**, read the **audit log**, and check **system health**.
 - Developers: `GET /api/openapi.json` + Swagger at `/docs`. Scripts should use API tokens (`Authorization: Bearer …`); browser mutations need the `X-CSRF-Token` header.
 
 #### Step 6: Database Snapshots & Point-in-Time Restore

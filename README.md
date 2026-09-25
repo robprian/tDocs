@@ -159,7 +159,8 @@ tdocs service remove
 | `TDOCS_SECRET_KEY` | auto (`.tdocs.key`) | MTProto session encryption |
 | `TDOCS_TG_APP_ID` / `TDOCS_TG_APP_HASH` | *(wizard)* | From my.telegram.org |
 | `TDOCS_CDN_PUBLIC` / `TDOCS_CDN_BASE_URL` | `true` / host | Public CDN behaviour |
-| `TDOCS_TLS_CERT_FILE` / `TDOCS_TLS_KEY_FILE` | *(empty)* | Enable HTTPS |
+| `TDOCS_TLS_CERT_FILE` / `TDOCS_TLS_KEY_FILE` | *(empty)* | Serve HTTPS from your own certificate files |
+| `TDOCS_HTTP_PORT` / `TDOCS_HTTPS_PORT` | `80` / `443` | Ports for built-in ACME HTTPS |
 | `TDOCS_BACKUP_INTERVAL` | `24h` | Automatic snapshot interval |
 | `TDOCS_NO_BROWSER` | *(empty)* | Set `1` to skip opening a browser |
 

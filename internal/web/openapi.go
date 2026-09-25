@@ -212,6 +212,13 @@ const openAPISpecTmpl = `{
     "/api/settings/password": {
       "post": { "summary": "Change the dashboard password", "requestBody": { "content": { "application/json": { "schema": { "type": "object", "required": ["current_password", "new_password"], "properties": { "current_password": { "type": "string" }, "new_password": { "type": "string" } } } } } }, "responses": { "200": { "description": "changed" } } }
     },
+    "/api/settings/domain": {
+      "get": { "summary": "Public domain + HTTPS status (superuser only)", "responses": { "200": { "description": "{domain, active, cert_expiry, last_error, hint}" }, "403": { "description": "superuser required" } } },
+      "post": { "summary": "Set the public domain and enable automatic HTTPS (superuser only)", "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "domain": { "type": "string" }, "email": { "type": "string" } } } } } }, "responses": { "200": { "description": "saved" }, "400": { "description": "invalid domain" } } }
+    },
+    "/api/settings/domain/retry": {
+      "post": { "summary": "Restart HTTPS listeners (superuser only)", "responses": { "200": { "description": "restarted" } } }
+    },
     "/api/notifications": {
       "get": { "summary": "Recent activity for the notification center", "responses": { "200": { "description": "notifications" } } }
     },
