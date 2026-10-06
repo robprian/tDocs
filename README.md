@@ -45,28 +45,28 @@ Other distributions with a compatible glibc userspace may also work. The primary
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./tdocs_2.1.0_amd64.deb
+sudo apt install ./tdocs_<version>_amd64.deb
 sudo systemctl enable --now tdocs
 ```
 
 ### RHEL / Rocky / Alma / Fedora
 
 ```bash
-sudo dnf install ./tdocs_2.1.0_x86_64.rpm
+sudo dnf install ./tdocs_<version>_x86_64.rpm
 sudo systemctl enable --now tdocs
 ```
 
 ### openSUSE / SUSE
 
 ```bash
-sudo zypper install ./tdocs_2.1.0_x86_64.rpm
-# or: sudo rpm -i ./tdocs_2.1.0_x86_64.rpm
+sudo zypper install ./tdocs_<version>_x86_64.rpm
+# or: sudo rpm -i ./tdocs_<version>_x86_64.rpm
 ```
 
 ### Universal tarball
 
 ```bash
-tar -xzf tdocs_2.1.0_linux_amd64.tar.gz
+tar -xzf tdocs_<version>_linux_amd64.tar.gz
 cd tdocs
 sudo ./install.sh          # system install + systemd (or --user for per-user)
 ```
@@ -95,6 +95,8 @@ tdocs start    # buka browser → dashboard
 Bare `tdocs` behaves like `tdocs start`: if the app is not configured yet, the setup wizard launches automatically.
 
 Needs `API_ID` + `API_HASH` from [my.telegram.org](https://my.telegram.org) → API development tools (once).
+
+> ⚠️ **Security:** Ganti password default segera setelah setup pertama: `tdocs passwd <new-password>` atau set `TDOCS_ADMIN_PASSWORD` di `.env` sebelum menjalankan server.
 
 **Dashboard:** http://localhost:8080  
 **Logs (service):** `sudo journalctl -u tdocs -f`  
@@ -155,7 +157,7 @@ tdocs service remove
 | `TDOCS_DB_PATH` | `<data>/tdocs.db` | SQLite path |
 | `TDOCS_CONFIG_DIR` | XDG / `/etc/tdocs` | Config directory (holds `.env`) |
 | `TDOCS_DATA_DIR` | XDG / `/var/lib/tdocs` | Data directory |
-| `TDOCS_ADMIN_PASSWORD` | `admin123` | Dashboard + Bearer API key |
+| `TDOCS_ADMIN_PASSWORD` | *(empty — wajib diisi)* | Dashboard + Bearer API key, ganti dari default |
 | `TDOCS_SECRET_KEY` | auto (`.tdocs.key`) | MTProto session encryption |
 | `TDOCS_TG_APP_ID` / `TDOCS_TG_APP_HASH` | *(wizard)* | From my.telegram.org |
 | `TDOCS_CDN_PUBLIC` / `TDOCS_CDN_BASE_URL` | `true` / host | Public CDN behaviour |

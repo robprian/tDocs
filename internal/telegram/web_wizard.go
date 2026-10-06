@@ -39,7 +39,7 @@ func wizardErrorText(err error) string {
 	case strings.Contains(msg, "PHONE_NUMBER_FLOOD"):
 		return "Too many attempts for this number. Wait a while before trying again."
 	case strings.Contains(msg, "SESSION_PASSWORD_NEEDED"):
-		return "Two-step verification is enabled on this account — enter your password."
+		return "Two-step verification is enabled on this account. Enter your password."
 	case strings.Contains(msg, "wizard timeout"):
 		return msg
 	case strings.Contains(msg, "wizard cancelled"):
@@ -53,7 +53,7 @@ func wizardErrorText(err error) string {
 
 // webWizardState is an in-memory state machine that walks a single
 // browser session through the gotd auth flow. The wizard is *not*
-// blocking — each step is a short poll/dispatch cycle. A goroutine
+// blocking: each step is a short poll/dispatch cycle. A goroutine
 // runs the flow on the backend so the user's browser can poll
 // /api/telegram/wizard/status for progress.
 type webWizardState struct {

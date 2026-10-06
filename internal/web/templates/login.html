@@ -73,7 +73,7 @@
             <div class="login-assurance">
                 <span>
                     <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    Secure sign-in — only you can access this dashboard
+                    Secure sign-in … only you can access this dashboard
                 </span>
                 <span>
                     <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
@@ -140,7 +140,7 @@
 
             // Caps Lock detection: only trust getModifierState when the browser
             // provides it, and never leave the hint pinned on. The hint is a
-            // plain `hidden` attribute — the CSS `[hidden]` rule guarantees it
+            // plain `hidden` attribute … the CSS `[hidden]` rule guarantees it
             // actually disappears (see style.css).
             function capsOn(e) {
                 return !!(e && typeof e.getModifierState === "function" && e.getModifierState("CapsLock"));

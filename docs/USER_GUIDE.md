@@ -67,7 +67,7 @@ npx tdocs login
 ```
 
 <div align="center">
-  <img src="assets/teledrive-login.png" alt="tDocs Login Terminal Wizard" width="600" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+  <img src="assets/tdocs-login.png" alt="tDocs Login Terminal Wizard" width="600" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
   <p><em>Figure 1: tDocs interactive terminal authentication wizard.</em></p>
 </div>
 
@@ -90,7 +90,7 @@ npx tdocs server
 By default, tDocs scans for an available port starting at `8080` and displays both local and LAN IP addresses. Open your web browser at:
 👉 **`http://localhost:8080`**
 
-- **Default Admin Password**: `admin123` (Configure via `TDOCS_ADMIN_PASSWORD`).
+- **Default Admin Password**: `admin123` — **wajib diganti** melalui `TDOCS_ADMIN_PASSWORD` di `.env` atau `tdocs passwd <new>`.
 
 #### Step 3: Navigating the Dashboard
 - **Overview tab** (default): file, folder, favorite and server metrics; five folder shortcuts; recent files; and a side panel for storage, Telegram connection and file categories. **Upload Files**, **New Folder** and **Sync Now** are available in the welcome panel. The storage ring shows category shares of stored bytes, not a percentage of a fixed quota.
@@ -135,7 +135,7 @@ tDocs is engineered with strict safeguards to protect your primary Telegram acco
 
 1. **Official Telemetry Emulation**: tDocs identifies itself using standard Telegram Desktop client parameters (`PC 64bit`, `Linux/x86_64`, `AppVersion 5.0.0`).
 2. **Sequential Safe Queue**: Uploads and downloads are processed sequentially (1 transfer at a time) mimicking natural desktop user behavior.
-3. **Pacing Delay**: An adaptive 30ms sleep is enforced between 512 KB chunks to keep connection temperatures low.
+3. **Pacing Delay**: An adaptive 20ms–50ms sleep is enforced between 512 KB chunks to keep connection temperatures low.
 4. **Automated Flood Control**: If Telegram issues a `FLOOD_WAIT_X` response, tDocs gracefully pauses until the cooldown elapses without crashing or hammering the API.
 5. **Encrypted Session at Rest**: Your MTProto session authentication keys are encrypted in SQLite using **AES-256-GCM** derived from your secret key.
 6. **Isolated Private Vault**: All file transfers go into a private storage channel with 0 external members.
@@ -253,7 +253,7 @@ npx tdocs login
 ```
 
 <div align="center">
-  <img src="assets/teledrive-login.png" alt="Tampilan Terminal Wizard Login tDocs" width="600" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+  <img src="assets/tdocs-login.png" alt="Tampilan Terminal Wizard Login tDocs" width="600" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
   <p><em>Gambar 1: Wizard otentikasi interaktif tDocs di terminal.</em></p>
 </div>
 
@@ -276,7 +276,7 @@ npx tdocs server
 Secara otomatis, tDocs akan mencari port yang tersedia mulai dari `8080` dan menampilkan alamat akses lokal maupun jaringan Wi-Fi/LAN. Buka browser Anda di:
 👉 **`http://localhost:8080`**
 
-- **Password Admin Bawaan**: `admin123` (Dapat diubah melalui variabel `TDOCS_ADMIN_PASSWORD`).
+- **Password Admin Bawaan**: `admin123` — **wajib diganti** melalui `TDOCS_ADMIN_PASSWORD` di `.env` atau `tdocs passwd <new>`.
 
 #### Langkah 3: Navigasi Antarmuka Web
 - **Overview** (tampilan awal): metrik file, folder, favorit dan server; lima pintasan folder; file terbaru; serta panel penyimpanan, koneksi Telegram dan kategori file. Tombol **Upload Files**, **New Folder** dan **Sync Now** tersedia di panel sambutan. Cincin penyimpanan menunjukkan proporsi ukuran tiap kategori, bukan persentase kuota tetap.
@@ -315,7 +315,7 @@ tDocs dirancang khusus dengan sistem pertahanan berlapis agar akun utama Telegra
 
 1. **Emulasi Telemetri Resmi**: tDocs menggunakan identitas klien resmi Telegram Desktop (`PC 64bit`, `Linux/x86_64`, `AppVersion 5.0.0`).
 2. **Antrean Sekuensial**: Proses upload dan download berjalan strictly 1 antrean dalam satu waktu, persis seperti kebiasaan manusia saat menggunakan aplikasi desktop resmi.
-3. **Pacing Delay**: Jeda adaptif sebesar 30ms diterapkan di antara bagian 512 KB untuk menjaga koneksi tetap stabil dan tidak dianggap aktivitas spamming.
+3. **Pacing Delay**: Jeda adaptif 20ms–50ms diterapkan di antara bagian 512 KB untuk menjaga koneksi tetap stabil dan tidak dianggap aktivitas spamming.
 4. **Penanganan Otomatis Flood Wait**: Jika Telegram mengirim sinyal `FLOOD_WAIT_X`, tDocs akan otomatis menunggu durasi jeda yang diminta tanpa melakukan serangan permintaan ulang (*hammering*).
 5. **Enkripsi Kunci Sesi (AES-256-GCM)**: Kunci otentikasi sesi Telegram MTProto dienkripsi menggunakan AES-256-GCM sebelum disimpan di database lokal.
 6. **Channel Pribadi Terisolasi**: File tersimpan di channel private dengan 0 anggota luar, sehingga file Anda tidak dapat diakses atau dicari oleh pengguna Telegram lain.

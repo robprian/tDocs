@@ -106,7 +106,20 @@ exists in this codebase:
 
 ---
 
-## 5. Web Application Security Controls (implemented & tested)
+## 5. Default Credentials & Hardening
+
+The default admin password (`admin123`) is a known weak credential. **Always change it** immediately after first setup:
+
+```bash
+tdocs passwd <strong-password>
+# or set TDOCS_ADMIN_PASSWORD in .env before starting the server
+```
+
+Production deployments must set `TDOCS_ADMIN_PASSWORD` in the environment or `.env` before the first start. The default is only for local development.
+
+---
+
+## 6. Web Application Security Controls (implemented & tested)
 
 * **Session authentication**: dashboard login mints a random 256-bit token kept
   server-side (30-day sliding expiry, listed/revocable under Settings →
