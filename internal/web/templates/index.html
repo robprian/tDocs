@@ -6,70 +6,10 @@
     <title>tDocs &mdash; Personal Cloud Storage</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="apple-touch-icon" href="/static/logo.png">
-    <link rel="stylesheet" href="/static/style.css?v=27">
+    <link rel="stylesheet" href="/static/style.css?v=28">
 </head>
 <body>
-    <!-- Header: brand + global search + account actions on one row. Under 860px
-         the search collapses to an icon toggle (see the responsive block). -->
-    <header class="header" id="app-header">
-        <button class="btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle Sidebar" aria-expanded="false" aria-controls="sidebar">
-            <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-        </button>
-        <a href="/" class="header-brand" aria-label="tDocs home">
-            <img src="/static/logo.png" alt="tDocs" class="brand-logo">
-            <span class="brand-text">tDocs</span>
-        </a>
 
-        <div class="header-search" role="search">
-            <div class="search-wrapper">
-                <span class="search-icon-left">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                </span>
-                <input type="search" class="search-input" id="search-box" placeholder="Search files…" autocomplete="off" aria-label="Search files">
-                <span class="search-kbd">Ctrl K</span>
-                <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()" aria-label="Clear Search">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="header-actions">
-            <button class="btn-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
-            </button>
-            <div class="notif-wrap">
-                <button class="btn-icon" id="notif-bell-btn" onclick="toggleNotifDropdown(event)" title="Notifications">
-                    <svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                    <span id="notif-badge" class="notif-badge" style="display: none;"></span>
-                </button>
-                <div id="notif-dropdown" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px); width: min(360px, calc(100vw - 32px)); max-height: 420px; overflow-y: auto;"></div>
-            </div>
-            <button class="btn-icon" onclick="openHelpModal()" title="Help &amp; How It Works">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </button>
-            <div style="position: relative;">
-                <button class="header-avatar" id="avatar-btn" onclick="toggleAvatarMenu(event)" title="Account">RA</button>
-                <div id="avatar-menu" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px);">
-                    <button class="dropdown-item" onclick="switchTab('settings')">
-                        <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                        <span>Settings</span>
-                    </button>
-                    <a class="dropdown-item" href="/docs" style="text-decoration: none;">
-                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        <span>API Docs</span>
-                    </a>
-                    <a class="dropdown-item" href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
-                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-                        <span>GitHub</span>
-                    </a>
-                    <a class="dropdown-item danger" href="/logout" style="text-decoration: none;">
-                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        <span>Sign Out</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </header>
 
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
@@ -83,82 +23,133 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
 
-            <a href="/" class="sidebar-brand" aria-label="tDocs home">
-                <img id="brand-logo-img" src="/static/logo-light.png" data-dark-src="/static/logo.png" alt="tDocs" class="brand-logo">
-            </a>
 
-            <div class="sidebar-actions">
-                <button class="btn btn-primary" style="width: 100%;" onclick="openFilePicker()">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span>Upload File</span>
-                </button>
-                <input type="file" id="file-input" multiple style="display: none;">
-                <button class="btn btn-secondary" style="width: 100%;" onclick="createFolderPrompt()">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
-                    <span>New Folder</span>
-                </button>
-            </div>
 
             <nav class="sidebar-nav">
                 <div class="sidebar-section-label">Menu</div>
-                <a class="nav-link nav-blue active" id="nav-overview" onclick="switchTab('overview')">
+                <button type="button" class="nav-link nav-blue active" id="nav-overview" onclick="switchTab('overview')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
                     <span>Overview</span>
-                </a>
-                <a class="nav-link nav-blue" id="nav-drive" onclick="switchTab('drive')">
+                </button>
+                <button type="button" class="nav-link nav-blue" id="nav-drive" onclick="switchTab('drive')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
                     <span>All Files</span>
-                </a>
-                <a class="nav-link nav-orange" id="nav-favorites" onclick="switchTab('favorites')">
+                </button>
+                <button type="button" class="nav-link nav-orange" id="nav-favorites" onclick="switchTab('favorites')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     <span>Favorites</span>
-                </a>
-                <a class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
+                </button>
+                <button type="button" class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     <span>Shared Links</span>
-                </a>
-                <a class="nav-link nav-red" id="nav-trash" onclick="switchTab('trash')">
+                </button>
+                <button type="button" class="nav-link nav-red" id="nav-trash" onclick="switchTab('trash')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     <span>Trash</span>
-                </a>
+                </button>
 
                 <div class="sidebar-section-label">Storage</div>
-                <a class="nav-link nav-green" id="nav-storage" onclick="switchTab('storage')">
+                <button type="button" class="nav-link nav-green" id="nav-storage" onclick="switchTab('storage')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
                     <span>Sync Center</span>
-                </a>
-                <a class="nav-link nav-green" id="nav-snapshots" onclick="switchTab('snapshots')">
+                </button>
+                <button type="button" class="nav-link nav-green" id="nav-snapshots" onclick="switchTab('snapshots')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
                     <span>Snapshots</span>
-                </a>
+                </button>
 
                 <div class="sidebar-section-label">Media</div>
-                <a class="nav-link nav-purple" id="nav-music" onclick="switchTab('music')">
+                <button type="button" class="nav-link nav-purple" id="nav-music" onclick="switchTab('music')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     <span>Music</span>
-                </a>
-                <a class="nav-link nav-purple" id="nav-videos" onclick="switchTab('videos')">
+                </button>
+                <button type="button" class="nav-link nav-purple" id="nav-videos" onclick="switchTab('videos')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
                     <span>Videos</span>
-                </a>
-                <a class="nav-link nav-purple" id="nav-images" onclick="switchTab('images')">
+                </button>
+                <button type="button" class="nav-link nav-purple" id="nav-images" onclick="switchTab('images')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     <span>Images</span>
-                </a>
+                </button>
 
                 <div class="sidebar-section-label">System</div>
-                <a class="nav-link nav-gray" id="nav-settings" onclick="switchTab('settings')">
+                <button type="button" class="nav-link nav-gray" id="nav-settings" onclick="switchTab('settings')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg>
                     <span>Settings</span>
-                </a>
+                </button>
             </nav>
 
 
-            <div class="sidebar-foot">
-                <div><strong>tDocs {{.Version}}</strong> &bull; MIT License</div>
-                <div><a href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted);">GitHub</a> &bull; <a href="/docs" style="color: var(--text-muted);">API Docs</a> &bull; <a href="/api/openapi.json" style="color: var(--text-muted);">OpenAPI</a></div>
+            <div class="sidebar-storage" aria-live="polite">
+                <strong id="sidebar-used">…</strong>
+                <span id="sidebar-storage-note">Loading storage…</span>
+                <div class="sidebar-storage-track" aria-hidden="true"><span></span></div>
             </div>
         </aside>
+
+        <!-- All upload actions share the native file picker. -->
+        <input type="file" id="file-input" multiple style="display: none;">
+
+        <!-- Topbar: global search + account actions -->
+    <header class="header" id="app-header">
+                <button class="btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle Sidebar" aria-expanded="false" aria-controls="sidebar">
+                    <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                </button>
+                <a href="/" class="header-brand" aria-label="tDocs home">
+                    <img id="brand-logo-img" src="/static/cloud-logo.webp" alt="" class="brand-logo" width="56" height="52">
+                    <span class="brand-text">tDocs</span>
+                </a>
+
+                <div class="header-search" role="search">
+                    <div class="search-wrapper">
+                        <span class="search-icon-left">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </span>
+                        <input type="search" class="search-input" id="search-box" placeholder="Search files, folders, or keywords..." autocomplete="off" aria-label="Search files and folders">
+                        <span class="search-kbd">Ctrl K</span>
+                        <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()" aria-label="Clear Search">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button class="btn-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+                    </button>
+                    <div class="notif-wrap">
+                        <button class="btn-icon" id="notif-bell-btn" onclick="toggleNotifDropdown(event)" title="Notifications">
+                            <svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                            <span id="notif-badge" class="notif-badge" style="display: none;"></span>
+                        </button>
+                        <div id="notif-dropdown" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px); width: min(360px, calc(100vw - 32px)); max-height: 420px; overflow-y: auto;"></div>
+                    </div>
+                    <button class="btn-icon" onclick="openHelpModal()" title="Help &amp; How It Works">
+                        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </button>
+                    <div style="position: relative;">
+                        <button class="header-avatar" id="avatar-btn" onclick="toggleAvatarMenu(event)" title="Account">RA</button>
+                        <div id="avatar-menu" class="dropdown-menu" style="display: none; right: 0; top: calc(100% + 8px);">
+                            <button class="dropdown-item" onclick="switchTab('settings')">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </button>
+                            <a class="dropdown-item" href="/docs" style="text-decoration: none;">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span>API Docs</span>
+                            </a>
+                            <a class="dropdown-item" href="https://github.com/robprian/tDocs" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+                                <span>GitHub</span>
+                            </a>
+                            <a class="dropdown-item danger" href="/logout" style="text-decoration: none;">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                <span>Sign Out</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
 
         <!-- Main Content -->
         <main class="content-area">
@@ -199,23 +190,25 @@
                         <div class="welcome-banner">
                             <div class="welcome-copy">
                                 <span class="welcome-kicker" id="ov-greeting-kicker">Welcome</span>
-                                <h1 id="ov-greeting-title">Your library at a glance</h1>
-                                <p>Your files are safe and always accessible.</p>
+                                <h1 id="ov-greeting-title">Your library at <span>a glance</span></h1>
+                                <p>Your files are safe and always accessible anywhere.</p>
+                                <div class="welcome-actions">
+                                    <button class="btn btn-primary" onclick="openFilePicker()">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        Upload Files
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="createFolderPrompt()">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+                                        New Folder
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="syncChannelNow()">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                                        Sync Now
+                                    </button>
+                                </div>
                             </div>
                             <div class="welcome-art" aria-hidden="true">
-                                <svg viewBox="0 0 200 120" class="welcome-illustration">
-                                    <ellipse cx="70" cy="88" rx="46" ry="10" fill="rgba(47,107,255,.12)"/>
-                                    <path d="M52 78h72a26 26 0 1 0-6.4-51.2A34 34 0 0 0 52 40a20 20 0 0 0 0 38Z" fill="url(#welcomeCloud)"/>
-                                    <path d="M132 40l26-14-8 22 12 3-30 12 6-14-6-9Z" fill="#4f8bff"/>
-                                    <circle cx="150" cy="30" r="3" fill="#9cc0ff"/>
-                                    <circle cx="163" cy="46" r="2" fill="#bcd4ff"/>
-                                    <defs>
-                                        <linearGradient id="welcomeCloud" x1="0" y1="0" x2="1" y2="1">
-                                            <stop offset="0" stop-color="#6ea8ff"/>
-                                            <stop offset="1" stop-color="#2f6bff"/>
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
+                                <img src="/static/cloud-library.webp" class="welcome-illustration" alt="" width="515" height="239">
                             </div>
                         </div>
 
@@ -223,31 +216,40 @@
 
                         <div id="ov-folders-section" style="display: none;">
                             <div class="section-header">
-                                <div class="section-title">My Folders</div>
-                                <button class="btn btn-ghost btn-sm" onclick="createFolderPrompt()">
-                                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
-                                    New Folder
-                                </button>
+                                <div class="section-title">
+                                    <img src="/static/folder-blue.webp" class="icon" alt="" width="26" height="26">
+                                    My Folders
+                                </div>
+                                <div class="section-actions">
+                                    <button class="details-link" onclick="navigateTo(null)">View All</button>
+                                    <button class="btn btn-primary btn-sm" onclick="createFolderPrompt()">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                        New Folder
+                                    </button>
+                                </div>
                             </div>
                             <div id="ov-folders-grid" class="folder-grid"></div>
                         </div>
 
                         <div class="panel-card">
                             <div class="recent-head">
-                                <div class="section-title">Recent Files</div>
+                                <div class="section-title">
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                    Recent Files
+                                </div>
                                 <div class="recent-head-actions">
-                                    <button class="details-link" onclick="switchTab('drive')">View All</button>
+                                    <button class="details-link" onclick="navigateTo(null)">View All</button>
                                     <span class="recent-view-toggle" role="group" aria-label="Recent files layout">
-                                        <button class="recent-view-btn active" onclick="switchTab('drive'); setViewMode('grid')" title="Grid view">
+                                        <button class="recent-view-btn active" onclick="navigateTo(null); setViewMode('grid')" title="Grid view">
                                             <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
                                         </button>
-                                        <button class="recent-view-btn" onclick="switchTab('drive'); setViewMode('list')" title="List view">
+                                        <button class="recent-view-btn" onclick="navigateTo(null); setViewMode('list')" title="List view">
                                             <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                                         </button>
                                     </span>
                                 </div>
                             </div>
-                            <div class="recent-cols"><span>Name</span><span>Modified</span><span>Size</span><span>Favorite</span><span></span></div>
+                            <div class="recent-cols"><span>Name</span><span>Modified</span><span>Size</span><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-label="Favorite"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span></span></div>
                             <div id="ov-recent-list" class="recent-list"></div>
                         </div>
 
@@ -266,24 +268,25 @@
                     </div>
 
                     <aside class="right-rail">
-                        <div class="rail-card">
-                            <div class="rail-card-head"><span class="rail-card-title">Storage</span></div>
+                        <div class="rail-card rail-storage">
+                            <div class="rail-card-head"><span class="rail-card-title">Storage</span><button class="rail-more" onclick="switchTab('storage')" aria-label="Open storage details">⋯</button></div>
                             <div class="rail-gauge">
                                 <svg id="ov-gauge" viewBox="0 0 120 120" class="gauge"></svg>
                                 <div class="gauge-center">
-                                    <div id="ov-used" class="gauge-used">—</div>
+                                    <div id="ov-used" class="gauge-used">…</div>
                                     <div class="gauge-cap">used</div>
                                 </div>
                             </div>
-                            <div class="rail-gauge-foot">
-                                <span class="rail-gauge-label">Telegram Cloud</span>
-                                <span class="rail-gauge-pill">Unlimited</span>
+                            <div class="storage-legend">
+                                <div class="storage-legend-row"><span class="legend-dot"></span><span>Used Space</span><strong id="ov-legend-used">…</strong></div>
+                                <div class="storage-legend-row"><span class="legend-dot legend-dot-unlimited"></span><span>Capacity</span><strong>Unlimited</strong></div>
+                                <div class="storage-legend-row"><span>Storage</span><strong>Telegram Cloud</strong></div>
                             </div>
                         </div>
 
-                        <div class="rail-card">
+                        <div class="rail-card rail-telegram">
                             <div class="rail-card-head">
-                                <span class="rail-card-title">Telegram</span>
+                                <span class="rail-card-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Telegram Cloud</span>
                                 <span id="tg-state-pill" class="tg-state-pill" role="status" aria-live="polite">Checking…</span>
                             </div>
                             <div class="rail-row">
@@ -291,8 +294,8 @@
                                 <span id="status-label" class="rail-row-main" aria-live="polite">Checking…</span>
                             </div>
                             <div class="rail-kv">
-                                <div class="rail-kv-row"><span>Storage Channel</span><strong id="status-channel">—</strong></div>
-                                <div class="rail-kv-row"><span>Files indexed</span><strong id="status-files">0</strong></div>
+                                <div class="rail-kv-row"><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>Storage Channel</span><strong id="status-channel">…</strong></div>
+                                <div class="rail-kv-row"><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 4v16"/></svg>Files indexed</span><strong id="status-files">0</strong></div>
                             </div>
                             <button class="btn btn-primary btn-block btn-sm" onclick="syncChannelNow()" title="Rebuild the file list from the Telegram Storage Channel">
                                 <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
@@ -300,41 +303,11 @@
                             </button>
                         </div>
 
-                        <div class="rail-card">
-                            <div class="rail-card-head"><span class="rail-card-title">Categories</span></div>
+                        <div class="rail-card rail-categories">
+                            <div class="rail-card-head"><span class="rail-card-title">Categories</span><button class="rail-more" onclick="navigateTo(null)" aria-label="Browse all categories">⋯</button></div>
                             <div id="ov-breakdown" class="breakdown-list cat-list"></div>
                         </div>
 
-                        <div class="rail-card">
-                            <div class="rail-card-head"><span class="rail-card-title">Quick Actions</span></div>
-                            <div class="quick-actions">
-                                <button class="quick-action" onclick="openFilePicker()">
-                                    <span class="qa-icon qa-blue"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-                                    <span>Upload Files</span>
-                                </button>
-                                <button class="quick-action" onclick="createFolderPrompt()">
-                                    <span class="qa-icon qa-amber"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></span>
-                                    <span>New Folder</span>
-                                </button>
-                                <button class="quick-action" onclick="switchTab('trash')">
-                                    <span class="qa-icon qa-rose"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span>
-                                    <span>Empty Trash</span>
-                                </button>
-                                <button class="quick-action" onclick="switchTab('settings')">
-                                    <span class="qa-icon qa-slate"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg></span>
-                                    <span>Settings</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="rail-card">
-                            <div class="rail-card-head"><span class="rail-card-title">System Status</span></div>
-                            <div class="sys-list">
-                                <div class="sys-row"><span class="sys-icon sys-blue"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 15 22 2Z"/></svg></span><div><div class="sys-name">Storage</div><div class="sys-sub">Telegram MTProto</div></div></div>
-                                <div class="sys-row"><span class="sys-icon sys-amber"><svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg></span><div><div class="sys-name">Database</div><div class="sys-sub">Local SQLite</div></div></div>
-                                <div class="sys-row"><span class="sys-icon sys-green"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><div class="sys-name">Encryption</div><div class="sys-sub">AES-256-GCM</div></div></div>
-                            </div>
-                        </div>
                     </aside>
                 </div>
 
@@ -638,7 +611,7 @@
                         <h3>API Tokens</h3>
                         <p>Machine keys for scripts. Shown once at creation.</p>
                         <div style="display: flex; gap: 8px; margin-bottom: 12px;"><input type="text" id="new-token-name" class="form-input" placeholder="Token name"><button class="btn btn-primary" id="token-create-btn" onclick="createApiToken()">Create</button></div>
-                        <div id="new-token-secret" style="display: none; margin-bottom: 12px;"><label class="form-label">Copy now — never shown again</label><div style="display: flex; gap: 8px;"><input type="text" id="new-token-secret-input" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem;"><button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('new-token-secret-input').value)">Copy</button></div></div>
+                        <div id="new-token-secret" style="display: none; margin-bottom: 12px;"><label class="form-label">Copy now. Never shown again</label><div style="display: flex; gap: 8px;"><input type="text" id="new-token-secret-input" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem;"><button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('new-token-secret-input').value)">Copy</button></div></div>
                         <div id="tokens-list"></div>
                     </div>
                     <div class="settings-card">
@@ -810,8 +783,8 @@
     <div id="mini-player" class="mini-player" style="display: none;">
         <div class="mp-cover" id="mp-cover" onclick="MediaEngine.restore()" title="Restore player"></div>
         <div class="mp-info" id="mp-info" role="button" tabindex="0" onclick="MediaEngine.restore()" title="Restore player">
-            <div class="mp-title" id="mp-title">—</div>
-            <div class="mp-sub" id="mp-sub">—</div>
+            <div class="mp-title" id="mp-title">…</div>
+            <div class="mp-sub" id="mp-sub">…</div>
         </div>
         <div class="mp-controls">
             <button class="btn-icon mp-full-only" id="mp-shuffle" onclick="MediaEngine.toggleShuffle()" title="Shuffle"></button>
@@ -949,6 +922,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=20"></script>
+    <script src="/static/app.js?v=21"></script>
 </body>
 </html>

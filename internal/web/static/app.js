@@ -17,6 +17,7 @@ let selectedIds = new Set();
 let favoriteIds = new Set();
 let folderStats = {};
 let ovRecentLimit = 8;
+let overviewStats = null;
 let uploadSeq = 0;
 
 // --- Authenticated API helper (CSRF + session expiry handling) ---
@@ -197,7 +198,7 @@ async function renderTelegramUnavailable(tbodyId, body) {
             <div class="tg-unavailable">
                 <span class="tg-state-dot" style="background: ${info.color};"></span>
                 <div>
-                    <div class="tg-unavailable-title">Telegram Storage — ${escapeHtml(info.short)}</div>
+                    <div class="tg-unavailable-title">Telegram Storage: ${escapeHtml(info.short)}</div>
                     <p class="tg-unavailable-text">${escapeHtml((body && body.message) || "The storage backend could not be reached.")}</p>
                     <p class="tg-unavailable-hint">Snapshots and sync history live in your Telegram Storage Channel, so they are unavailable until the backend is connected.</p>
                 </div>
@@ -205,7 +206,7 @@ async function renderTelegramUnavailable(tbodyId, body) {
         </td></tr>`;
 }
 
-// Explicit, real backend test — never reports success on configuration alone.
+// Explicit, real backend test: never reports success on configuration alone.
 async function testTelegramConnection() {
     const btn = document.getElementById("btn-test-connection");
     const label = document.getElementById("test-conn-text");
@@ -316,13 +317,14 @@ async function refreshTelegramState(live) {
         const title = document.querySelector("#telegram-setup-banner .wizard-banner-title");
         const sub = document.querySelector("#telegram-setup-banner .wizard-banner-sub");
         const info = tgStateInfo(s.state);
-        if (title) title.innerText = "Telegram Storage — " + info.short;
+        if (title) title.innerText = "Telegram Storage: " + info.short;
         if (sub) sub.innerText = s.message || "Connect your Telegram account to start storing files.";
         const pill = document.getElementById("tg-state-pill");
         if (pill) {
             pill.innerText = info.short;
             pill.className = "tg-state-pill tg-" + (s.state || "error");
         }
+        if (currentTab === "overview" && overviewStats) renderOverviewMetrics(overviewStats);
         return s;
     } catch (e) {
         return null;
@@ -353,13 +355,6 @@ function setTheme(theme) {
         themeBtn.innerHTML = theme === "dark" ? getIcon("sun") : getIcon("moon");
         themeBtn.setAttribute("title", `Switch to ${theme === "dark" ? "Light" : "Dark"} mode`);
     }
-    // Swap header logo variant so the wordmark stays readable.
-    document.querySelectorAll('img[data-dark-src]').forEach(img => {
-        const light = img.getAttribute('src');
-        const dark  = img.getAttribute('data-dark-src');
-        if (!light || !dark) return;
-        img.src = theme === 'dark' ? dark : light;
-    });
 }
 
 // --- Toast System ---
@@ -453,6 +448,7 @@ function switchTab(tab) {
 
 // --- Drive Content Loading ---
 async function loadDriveContent() {
+    if (activeSearchQuery) return performSearch(activeSearchQuery);
     skeletonCards(document.getElementById("folders-grid"), 4);
     skeletonCards(document.getElementById("files-grid"), 6);
     skeletonRows(document.getElementById("table-body"), 6);
@@ -527,6 +523,7 @@ function renderBreadcrumbs() {
 }
 
 function navigateTo(folderId, folderName) {
+    if (currentTab !== "drive") currentFolderPath = [];
     if (folderId === null) {
         currentFolderId = null;
         currentFolderPath = [];
@@ -540,7 +537,8 @@ function navigateTo(folderId, folderName) {
         currentFolderId = folderId;
     }
     clearSearch(false);
-    loadDriveContent();
+    if (currentTab !== "drive") switchTab("drive");
+    else loadDriveContent();
 }
 
 // --- View Switching (Grid vs List/Table) ---
@@ -818,6 +816,10 @@ function setupSearch() {
 
 async function performSearch(query) {
     activeSearchQuery = query;
+    if (query && currentTab !== "drive") {
+        switchTab("drive");
+        return;
+    }
     const banner = document.getElementById("search-banner");
     const bannerText = document.getElementById("search-banner-text");
 
@@ -846,6 +848,7 @@ async function performSearch(query) {
 }
 
 function clearSearch(reload = true) {
+    clearTimeout(searchDebounceTimer);
     const input = document.getElementById("search-box");
     const clearBtn = document.getElementById("search-clear-btn");
     const banner = document.getElementById("search-banner");
@@ -1147,7 +1150,8 @@ async function syncChannelNow() {
         }
         const data = await res.json();
         showToast(`Channel sync done: ${data.inserted} recovered, ${data.updated} refreshed (${data.total} total).`, "success", 5000);
-        await loadDriveContent();
+        if (currentTab === "overview") await loadOverview();
+        else await loadDriveContent();
     } catch (err) {
         showToast("Sync error: " + err.message, "error", 6000);
     } finally {
@@ -1431,7 +1435,7 @@ async function processNextUpload() {
         currentItem.chunkStatus = "Uploaded to Telegram Vault";
         uploadStats.completed++;
         if (dupOf) {
-            showToast(`Uploaded ${file.name} — identical content already stored`, "info", 6000);
+            showToast(`Uploaded ${file.name}: identical content already stored`, "info", 6000);
         } else {
             showToast(`Uploaded ${file.name}`, "success");
         }
@@ -1587,7 +1591,7 @@ async function openPreview(id, name, mime, size) {
             <div style="padding: 36px 20px; text-align: center; width: 100%;">
                 <div class="mp-cover" style="width:72px;height:72px;margin:0 auto 16px;border-radius:20px;">${getIcon("music", "icon-lg")}</div>
                 <div style="font-weight:800;">${escapeHtml(name)}</div>
-                <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 12px;">Playing in the mini player — browse freely, audio keeps going.</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 12px;">Playing in the mini player. Browse freely, audio keeps going.</div>
                 <button class="btn btn-secondary" onclick="MediaEngine.toggle()">Play / Pause</button>
             </div>
         `;
@@ -1861,11 +1865,12 @@ function createFolderPrompt() {
                 const res = await apiFetch("/api/folders", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, parent_id: currentFolderId })
+                    body: JSON.stringify({ name, parent_id: currentTab === "overview" ? null : currentFolderId })
                 });
                 if (!res.ok) throw new Error("Failed to create folder");
                 showToast(`Folder "${name}" created`, "success");
-                loadDriveContent();
+                if (currentTab === "overview") loadOverview();
+                else loadDriveContent();
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -1888,8 +1893,11 @@ function promptRenameFolder(id, currentName) {
                     body: JSON.stringify({ name: newName })
                 });
                 if (!res.ok) throw new Error("Failed to rename folder");
+                const crumb = currentFolderPath.find(f => f.id === id);
+                if (crumb) crumb.name = newName;
                 showToast("Folder renamed", "success");
-                loadDriveContent();
+                if (currentTab === "overview") loadOverview();
+                else loadDriveContent();
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -1907,8 +1915,13 @@ function confirmDeleteFolder(id, name) {
             try {
                 const res = await apiFetch(`/api/folders/${id}`, { method: "DELETE" });
                 if (!res.ok) throw new Error("Failed to delete folder");
+                if (currentFolderId === id || currentFolderPath.some(f => f.id === id)) {
+                    currentFolderId = null;
+                    currentFolderPath = [];
+                }
                 showToast(`Folder "${name}" deleted`, "success");
-                loadDriveContent();
+                if (currentTab === "overview") loadOverview();
+                else loadDriveContent();
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -1932,7 +1945,8 @@ function promptRenameFile(id, currentName) {
                 });
                 if (!res.ok) throw new Error("Failed to rename file");
                 showToast("File renamed", "success");
-                loadDriveContent();
+                if (currentTab === "overview") loadOverview();
+                else loadDriveContent();
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -1951,7 +1965,8 @@ function confirmDeleteFile(id, name) {
                 const res = await apiFetch(`/api/files/${id}`, { method: "DELETE" });
                 if (!res.ok) throw new Error("Failed to delete file");
                 showToast(`File "${name}" deleted`, "success");
-                loadDriveContent();
+                if (currentTab === "overview") loadOverview();
+                else loadDriveContent();
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -2069,33 +2084,22 @@ function renderOverviewFolders(folders) {
     const section = document.getElementById("ov-folders-section");
     const grid = document.getElementById("ov-folders-grid");
     if (!grid) return;
-
+    if (section) section.style.display = "block";
     if (!folders || folders.length === 0) {
-        if (section) section.style.display = "none";
+        grid.innerHTML = '<p class="dashboard-message">No folders yet. Create a folder to organize your files.</p>';
         return;
     }
-    if (section) section.style.display = "block";
-
-    // Cap the overview to a single tidy row; the rest lives in All Files.
-    const hues = ["#2f6bff", "#8b5cf6", "#f472b6", "#10b981", "#f59e0b"];
-    const shown = folders.slice(0, 5);
-    grid.innerHTML = shown.map((f, i) => {
-        const st = folderStats[f.id] || { files: 0, bytes: 0 };
-        const hue = hues[i % hues.length];
-        const bytesLabel = st.bytes ? formatSize(st.bytes) : "Empty";
-        return `
-        <div class="folder-card" onclick="navigateTo('${f.id}', '${ja(f.name)}')" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${f.id}', this)">
-            <div class="folder-card-top">
-                <span class="folder-glyph" aria-hidden="true" style="color:${hue};">
-                    <svg viewBox="0 0 32 26" fill="none">
-                        <path d="M1 5.5A3.5 3.5 0 0 1 4.5 2h5.9a3 3 0 0 1 2.4 1.2l1.3 1.7a3 3 0 0 0 2.4 1.2h10.5A3.5 3.5 0 0 1 30.5 9v11.5A3.5 3.5 0 0 1 27 24H4.5A3.5 3.5 0 0 1 1 20.5V5.5Z" fill="currentColor" opacity=".22"/>
-                        <path d="M1 8.5A3.5 3.5 0 0 1 4.5 5h23A3.5 3.5 0 0 1 31 8.5v12A3.5 3.5 0 0 1 27.5 24h-23A3.5 3.5 0 0 1 1 20.5v-12Z" fill="currentColor"/>
-                    </svg>
-                </span>
-                <button class="folder-kebab" title="More actions" onclick="event.stopPropagation(); showCtxMenu(event, 'folder', '${f.id}', this.closest('.folder-card'))">⋯</button>
-            </div>
-            <div class="folder-card-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
-            <div class="folder-card-meta"><span>${bytesLabel}</span><span> · ${st.files} files</span></div>
+    const icons = ["blue", "purple", "pink", "teal", "yellow"];
+    grid.innerHTML = folders.slice(0, 5).map((f, i) => {
+        const st = folderStats[f.id];
+        const meta = st ? `${formatSize(st.bytes)} · ${st.files} files` : "Folder details unavailable";
+        return `<div class="folder-card" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${ja(f.id)}', this)">
+            <button type="button" class="folder-open" onclick="navigateTo('${ja(f.id)}', '${ja(f.name)}')" aria-label="Open folder ${escapeHtml(f.name)}">
+                <span class="folder-card-top"><span class="folder-glyph"><img src="/static/folder-${icons[i]}.webp" alt="" width="56" height="50" loading="lazy" decoding="async"></span></span>
+                <span class="folder-card-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+                <span class="folder-card-meta">${meta}</span>
+            </button>
+            <button type="button" class="folder-kebab" aria-label="Actions for ${escapeHtml(f.name)}" title="More actions" onclick="showCtxMenu(event, 'folder', '${ja(f.id)}', this.closest('.folder-card'))">⋯</button>
         </div>`;
     }).join("");
 }
@@ -2105,31 +2109,28 @@ function renderOverviewGreeting() {
     const hour = new Date().getHours();
     const part = hour < 5 ? "Good night" : hour < 11 ? "Good morning" : hour < 15 ? "Good afternoon" : hour < 19 ? "Good evening" : "Good night";
     const kicker = document.getElementById("ov-greeting-kicker");
-    const title = document.getElementById("ov-greeting-title");
-    if (kicker) kicker.textContent = part + ",";
-    if (title) title.textContent = "Your library at a glance";
+    if (kicker) kicker.textContent = part;
 }
 
 function renderOverviewMetrics(s) {
     const cards = document.getElementById("ov-stat-cards");
     if (!cards) return;
-    const health = String(s.telegram_state || "");
-    const healthy = health === "connected";
-    const healthText = healthy ? "Connected" : (health ? tgStateInfo(health).short : "Checking…");
-    const healthCls = healthy ? "stat-health-ok" : "stat-health-bad";
+    const health = TG_STATE[lastTelegramState ? lastTelegramState.state : s.telegram_state];
+    const healthy = !!health && health.live;
+    const healthText = health ? health.short : "Unknown";
+    const count = value => typeof value === "number" ? value.toLocaleString() : "Unavailable";
+    const size = value => typeof value === "number" ? formatSize(value) : "Unavailable";
     cards.innerHTML = `
         <div class="stat-card stat-card-hero">
-            <div class="hero-top">
-                <span class="hero-main">${getIcon("folder")}<span class="stat-value">${s.files}</span></span>
-                <span class="hero-cloud"><svg class="icon" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
-            </div>
-            <span class="stat-label">Files \u00b7 ${s.folders} folders</span>
-            <span class="hero-foot"><span class="hero-quota">${formatSize(s.bytes)} stored</span><span class="hero-pill ${healthCls}">${escapeHtml(healthText)}</span></span>
+            <div class="hero-top"><div class="hero-main">
+                <span class="metric-folder"><img src="/static/folder-metric.webp" alt="" width="42" height="40"></span>
+                <span class="metric-main"><span class="stat-value">${count(s.files)}</span><span class="stat-label">Files • ${count(s.folders)} folders</span></span>
+            </div><span class="hero-cloud" aria-hidden="true"><img src="/static/folder-blue.webp" alt="" width="82" height="74"></span></div>
+            <div class="hero-foot"><span class="hero-quota">${size(s.bytes)} stored</span><span class="hero-pill ${healthy ? "stat-health-ok" : "stat-health-bad"}">${escapeHtml(healthText)}</span></div>
         </div>
-        <div class="stat-card"><span class="stat-label">Stored</span><span class="stat-value">${formatSize(s.bytes)}</span><span class="stat-sub">Telegram Cloud \u00b7 ${formatSize(s.db_bytes || 0)} local DB</span></div>
-        <div class="stat-card"><span class="stat-label">Favorites</span><span class="stat-value">${s.favorites}</span><span class="stat-sub">starred files</span></div>
-        <div class="stat-card"><span class="stat-label">Uptime</span><span class="stat-value" style="font-size:1.15rem;">${formatDuration(s.uptime_seconds || 0)}</span><span class="stat-note ${healthCls}">Telegram: ${escapeHtml(healthText)}</span></div>
-    `;
+        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-storage">${getIcon("database")}</span><div class="stat-detail"><span class="stat-label">Stored</span><span class="stat-value">${size(s.bytes)}</span><span class="stat-sub">Telegram Cloud<br>${size(s.db_bytes)} local DB</span></div></div>
+        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-favorites">${getIcon("star")}</span><div class="stat-detail"><span class="stat-label">Favorites</span><span class="stat-value">${count(s.favorites)}</span><span class="stat-sub">Starred files</span></div></div>
+        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-uptime">${getIcon("clock")}</span><div class="stat-detail"><span class="stat-label">Uptime</span><span class="stat-value">${typeof s.uptime_seconds === "number" ? formatDuration(s.uptime_seconds) : "Unavailable"}</span><span class="stat-sub" style="color:${health ? health.color : "var(--text-muted)"}">Telegram: ${escapeHtml(healthText)}</span></div></div>`;
 }
 
 async function loadOverview() {
@@ -2138,11 +2139,22 @@ async function loadOverview() {
     const _rl = document.getElementById("ov-recent-list");
     if (_rl) _rl.innerHTML = '<div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>';
     const _fg = document.getElementById("ov-folders-grid");
+    const folderSection = document.getElementById("ov-folders-section");
+    if (folderSection) folderSection.style.display = "block";
     if (_fg) _fg.innerHTML = '<div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>';
     try {
         const res = await apiFetch(`/api/stats?limit=${ovRecentLimit}`);
         if (!res.ok) throw new Error("stats failed");
         const s = await res.json();
+        overviewStats = s;
+        cachedFiles = s.recent || [];
+        try {
+            const favRes = await apiFetch("/api/favorites");
+            if (!favRes.ok) throw new Error("favorites unavailable");
+            favoriteIds = new Set((await favRes.json() || []).map(f => f.id));
+        } catch (e) {
+            showToast("Favorite status could not be refreshed.", "warning");
+        }
 
         // Fetch folders for the "My Folders" section
         try {
@@ -2150,136 +2162,107 @@ async function loadOverview() {
                 apiFetch("/api/folders"),
                 apiFetch("/api/folders/stats")
             ]);
+            folderStats = {};
+            if (!foldersRes.ok) throw new Error("folders unavailable");
             if (foldersRes.ok) {
                 const folders = await foldersRes.json() || [];
                 if (statsRes.ok) {
                     const stats = await statsRes.json() || [];
-                    folderStats = {};
                     stats.forEach(st => { folderStats[st.id] = st; });
                 }
                 renderOverviewFolders(folders);
             }
-        } catch (e) { /* folders are decorative */ }
+        } catch (e) {
+            if (_fg) _fg.innerHTML = '<p class="dashboard-message">Folders could not be loaded.</p>';
+        }
 
         renderOverviewMetrics(s);
 
-        const usedEl = document.getElementById("ov-used");
-        const totalQuota = 50 * 1024 * 1024 * 1024;
-        const usedFrac = Math.min(1, (s.bytes || 0) / totalQuota);
-        if (usedEl) usedEl.innerText = formatSize(s.bytes);
+        const stored = typeof s.bytes === "number" ? formatSize(s.bytes) : "Unavailable";
+        ["ov-used", "ov-legend-used", "sidebar-used"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = stored;
+        });
+        const note = document.getElementById("sidebar-storage-note");
+        if (note) note.textContent = "used · Unlimited";
+        const cats = s.breakdown || [];
         const gauge = document.getElementById("ov-gauge");
         if (gauge) {
-            const cats = s.breakdown || [];
-            const total = cats.reduce((a, c) => a + c.bytes, 0) || 1;
-            const colors = { image: "#2f6bff", video: "#8b5cf6", audio: "#f472b6", document: "#10b981", other: "#f59e0b" };
-            // Reference storage ring: full track plus one coloured arc per
-            // stored category, drawn back-to-back around the circle.
-            const R = 48, CX = 60, CY = 60;
-            const pt = frac => {
-                const a = (-90 + frac * 360) * Math.PI / 180;
-                return [CX + R * Math.cos(a), CY + R * Math.sin(a)];
-            };
-            const arc = (f0, f1) => {
-                const [x0, y0] = pt(f0), [x1, y1] = pt(f1);
-                const large = (f1 - f0) * 360 > 180 ? 1 : 0;
-                return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${R} ${R} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
-            };
-            let acc = 0, segs = "";
-            cats.forEach(c => {
-                const frac = c.bytes / total;
-                if (frac > 0.002) segs += `<path d="${arc(acc, acc + frac)}" stroke="${colors[c.category] || "#94a3b8"}" stroke-width="12" fill="none" stroke-linecap="round"/>`;
-                acc += frac;
-            });
-            const usedArc = usedFrac > 0.002
-                ? `<path d="${arc(0, usedFrac)}" stroke="url(#ovGaugeGrad)" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.35"/>`
-                : "";
-            gauge.innerHTML = `
-                <defs><linearGradient id="ovGaugeGrad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2f6bff"/>
-                </linearGradient></defs>
-                <path d="${arc(0, 1)}" stroke="var(--track)" stroke-width="12" fill="none" stroke-linecap="round"/>${usedArc}${segs}`;
+            const total = cats.reduce((sum, c) => sum + Math.max(0, Number(c.bytes) || 0), 0);
+            const colors = { image: "url(#ovGaugeBlue)", video: "url(#ovGaugePurple)", audio: "url(#ovGaugePurple)", document: "url(#ovGaugeBlue)", other: "url(#ovGaugeBlue)" };
+            const circumference = 2 * Math.PI * 48;
+            let offset = 0;
+            const segments = cats.map(c => {
+                const length = total ? Math.max(0, Number(c.bytes) || 0) / total * circumference : 0;
+                if (!length) return "";
+                const segment = `<circle cx="60" cy="60" r="48" fill="none" stroke="${colors[c.category] || "#7d8baa"}" stroke-width="12" stroke-dasharray="${length} ${circumference}" stroke-dashoffset="${-offset}" transform="rotate(-90 60 60)"/>`;
+                offset += length;
+                return segment;
+            }).join("");
+            gauge.setAttribute("role", "img");
+            gauge.setAttribute("aria-label", `${stored} stored. Ring shows file-category share, not capacity. Telegram capacity is unlimited.`);
+            gauge.innerHTML = `<defs>
+                <linearGradient id="ovGaugeBlue" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0062ff"/><stop offset=".55" stop-color="#087bff"/><stop offset="1" stop-color="#69c9ff"/></linearGradient>
+                <linearGradient id="ovGaugePurple" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7960ff"/><stop offset="1" stop-color="#c844ef"/></linearGradient>
+            </defs><circle cx="60" cy="60" r="48" stroke="var(--track)" stroke-width="12" fill="none"/>${segments}`;
         }
 
         const bd = document.getElementById("ov-breakdown");
         if (bd) {
-            const cats = s.breakdown || [];
             const labels = { image: "Images", video: "Videos", audio: "Audio", document: "Documents", other: "Other files" };
-            const dots = { image: "#2f6bff", video: "#8b5cf6", audio: "#f472b6", document: "#f59e0b", other: "#94a3b8" };
+            const colors = { image: "#168aff", video: "#a54bea", audio: "#f64191", document: "#ffb900", other: "#9badc6" };
+            const icons = { image: "image", video: "play", audio: "music", document: "file-text", other: "folder" };
+            const order = ["audio", "document", "image", "other", "video"];
+            const ordered = [...cats].sort((a, b) => {
+                const ai = order.indexOf(a.category), bi = order.indexOf(b.category);
+                return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi);
+            });
             bd.innerHTML = cats.length === 0
-                ? `<p style="font-size:0.8rem;color:var(--text-muted);">Nothing stored yet.</p>`
-                : cats.map(c => `
-                    <div class="cat-item">
-                        <span class="cat-dot" style="background: ${dots[c.category] || "#94a3b8"};"></span>
-                        <span class="cat-name">${labels[c.category] || c.category}</span>
-                        <span class="cat-bytes">${formatSize(c.bytes)}</span>
-                    </div>`).join("");
+                ? '<p class="dashboard-message">Nothing stored yet.</p>'
+                : ordered.map(c => `<div class="cat-item">
+                    <span class="cat-icon" aria-hidden="true" style="background:${colors[c.category] || "#9badc6"}">${getIcon(icons[c.category] || "file", "icon-sm")}</span>
+                    <span class="cat-name">${escapeHtml(labels[c.category] || c.category)}</span>
+                    <span class="cat-bytes">${formatSize(c.bytes)}</span>
+                </div>`).join("");
         }
 
         const recent = document.getElementById("ov-recent-list");
         if (recent) {
             const files = s.recent || [];
             recent.innerHTML = files.length === 0
-                ? `<p style="font-size:0.8rem;color:var(--text-muted);">No files yet — upload something.</p>`
+                ? `<p style="font-size:0.8rem;color:var(--text-muted);">No files yet. Upload something.</p>`
                 : files.map(f => {
                     const cat = getFileCategory(f.mime_type, f.name);
                     return `
-                    <div class="recent-row" onclick="openPreview('${f.id}', '${ja(f.name)}', '${f.mime_type}', ${f.size})">
+                    <div class="recent-row" data-name="${escapeHtml(f.name)}" onclick="openPreview('${ja(f.id)}', '${ja(f.name)}', '${ja(f.mime_type)}', ${Number(f.size) || 0})">
                         <span class="type-tile ${cat.tile}">${getIcon(cat.icon, "icon-sm")}</span>
-                        <span class="recent-file-name"><span class="rname" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span><span class="recent-file-kind">${cat.category.charAt(0).toUpperCase() + cat.category.slice(1)} · ${(f.name.split('.').pop() || '').toUpperCase()}</span></span>
-                        <span class="rmeta">${formatDate(f.updated_at || f.created_at)}</span>
+                        <button type="button" class="recent-file-name" onclick="event.stopPropagation(); openPreview('${ja(f.id)}', '${ja(f.name)}', '${ja(f.mime_type)}', ${Number(f.size) || 0})" aria-label="Preview ${escapeHtml(f.name)}"><span class="rname" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span></button>
+                        <span class="rmeta">${formatDateTime(f.updated_at || f.created_at)}</span>
                         <span class="rmeta">${formatSize(f.size)}</span>
-                        <button class="recent-star ${favoriteIds.has(f.id) ? 'is-favorite' : ''}" onclick="event.stopPropagation(); toggleFavorite('${f.id}', ${!favoriteIds.has(f.id)})" title="Favorite">${getIcon("star", "icon-sm")}</button>
-                        <button class="btn-icon" style="width:30px;height:30px;" title="More actions" onclick="event.stopPropagation(); showCtxMenu(event, 'file', '${f.id}', this)">${getIcon("more-vertical", "icon-sm")}</button>
+                        <button type="button" data-file-id="${escapeHtml(f.id)}" class="recent-star ${favoriteIds.has(f.id) ? 'is-favorite' : ''}" onclick="event.stopPropagation(); toggleFavorite('${ja(f.id)}', ${!favoriteIds.has(f.id)})" aria-pressed="${favoriteIds.has(f.id)}" aria-label="${favoriteIds.has(f.id) ? "Unfavorite" : "Favorite"} ${escapeHtml(f.name)}" title="${favoriteIds.has(f.id) ? "Unfavorite" : "Favorite"}">${getIcon("star", "icon-sm")}</button>
+                        <button type="button" class="btn-icon" title="More actions" aria-label="Actions for ${escapeHtml(f.name)}" onclick="event.stopPropagation(); showCtxMenu(event, 'file', '${ja(f.id)}', this.closest('.recent-row'))">${getIcon("more-vertical", "icon-sm")}</button>
                     </div>`;
                 }).join("") + (files.length >= ovRecentLimit
                         ? `<button class="load-more-btn" onclick="ovRecentLimit += 12; loadOverview();">Load More ▾</button>`
                         : "");
         }
 
-        const dupBox = document.getElementById("ov-duplicates");
-        if (dupBox) {
-            try {
-                const dres = await apiFetch("/api/duplicates");
-                const groups = await dres.json() || [];
-                dupBox.innerHTML = groups.length === 0
-                    ? `<p style="font-size:0.8rem;color:var(--text-muted);">No duplicate content detected.</p>`
-                    : groups.slice(0, 5).map(g => `
-                        <div class="recent-row" onclick="viewDuplicateGroup('${g.sha256}')">
-                            <span style="color: var(--warning);">${getIcon("copy")}</span>
-                            <span class="rname" title="${g.sha256}">${g.count} identical files</span>
-                            <span class="rmeta">${formatSize(g.bytes)} wasted</span>
-                        </div>`).join("");
-            } catch (e) { /* optional */ }
-        }
     } catch (err) {
-        showToast("Overview failed: " + err.message, "error");
-    }
-}
-
-async function viewDuplicateGroup(sha) {
-    try {
-        const res = await apiFetch(`/api/duplicates?sha=${encodeURIComponent(sha)}`);
-        const files = await res.json() || [];
-        showConfirmDialog({
-            title: "Duplicate Files",
-            message: files.map(f => `• ${f.name} (${formatSize(f.size)})`).join("\n") + "\n\nMove all copies except the newest to Trash?",
-            confirmText: "Trash Duplicates",
-            danger: true,
-            onConfirm: async () => {
-                const sorted = [...files].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
-                const ids = sorted.slice(1).map(f => f.id);
-                if (ids.length === 0) return;
-                await apiFetch("/api/files/bulk", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "trash", ids })
-                });
-                showToast(`Moved ${ids.length} duplicate(s) to Trash`, "success");
-                loadOverview();
-            }
+        overviewStats = null;
+        ["ov-stat-cards", "ov-recent-list", "ov-folders-grid", "ov-breakdown"].forEach(id => {
+            const panel = document.getElementById(id);
+            if (panel) panel.innerHTML = '<p class="dashboard-message">Could not load this panel. <button type="button" class="details-link" onclick="loadOverview()">Try again</button></p>';
         });
-    } catch (err) {
-        showToast(err.message, "error");
+        ["ov-used", "ov-legend-used", "sidebar-used"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = "Unavailable";
+        });
+        const gauge = document.getElementById("ov-gauge");
+        if (gauge) {
+            gauge.innerHTML = '<circle cx="60" cy="60" r="48" stroke="var(--track)" stroke-width="12" fill="none"/>';
+            gauge.setAttribute("aria-label", "Storage data unavailable");
+        }
+        showToast("Overview failed: " + err.message, "error");
     }
 }
 
@@ -2287,17 +2270,35 @@ async function viewDuplicateGroup(sha) {
 async function toggleFavorite(id, makeFav) {
     const had = favoriteIds.has(id);
     if (makeFav) favoriteIds.add(id); else favoriteIds.delete(id);
+    const updateOverview = () => {
+        document.querySelectorAll("#ov-recent-list .recent-star").forEach(btn => {
+            if (btn.dataset.fileId !== id) return;
+            const fav = favoriteIds.has(id);
+            const file = cachedFiles.find(f => f.id === id);
+            btn.classList.toggle("is-favorite", fav);
+            btn.setAttribute("aria-pressed", String(fav));
+            btn.title = fav ? "Unfavorite" : "Favorite";
+            btn.setAttribute("aria-label", `${btn.title} ${file ? file.name : "file"}`);
+            btn.onclick = event => { event.stopPropagation(); toggleFavorite(id, !favoriteIds.has(id)); };
+        });
+    };
     if (currentTab === "favorites") loadFavorites();
     else if (currentTab === "media") loadMediaLibrary();
+    else if (currentTab === "overview") updateOverview();
     else renderActiveView();
     try {
         const res = await apiFetch(`/api/files/${id}/favorite`, { method: makeFav ? "POST" : "DELETE" });
         if (!res.ok) throw new Error("Favorite update failed");
+        if (overviewStats && typeof overviewStats.favorites === "number" && had !== makeFav) {
+            overviewStats.favorites += makeFav ? 1 : -1;
+            if (currentTab === "overview") renderOverviewMetrics(overviewStats);
+        }
         showToast(makeFav ? "Added to favorites" : "Removed from favorites", "success");
     } catch (err) {
         if (had) favoriteIds.add(id); else favoriteIds.delete(id);
         if (currentTab === "favorites") loadFavorites();
         else if (currentTab === "media") loadMediaLibrary();
+        else if (currentTab === "overview") updateOverview();
         else renderActiveView();
         showToast(err.message, "error");
     }
@@ -2472,7 +2473,7 @@ async function loadStorageCenter() {
                     <div class="tg-unavailable">
                         <span class="tg-state-dot" style="background:${info.color};"></span>
                         <div>
-                            <div class="tg-unavailable-title">Telegram Storage — ${escapeHtml(info.short)}</div>
+                            <div class="tg-unavailable-title">Telegram Storage: ${escapeHtml(info.short)}</div>
                             <p class="tg-unavailable-text">${escapeHtml((stateInfo && stateInfo.message) || "The storage backend could not be verified.")}</p>
                             <p class="tg-unavailable-hint">Sync and Snapshots are unavailable until the backend is connected. Files already catalogued stay browsable.</p>
                         </div>
@@ -2655,7 +2656,7 @@ async function saveDomainSettings() {
         }
         const d = await res.json().catch(() => ({}));
         if (d.last_error) showToast(d.last_error, "error", 8000);
-        else showToast(domain ? "Domain saved — HTTPS listening for " + domain : "Domain removed — back to plain HTTP", "success");
+        else showToast(domain ? "Domain saved. HTTPS listening for " + domain : "Domain removed. Back to plain HTTP", "success");
         loadDomainSettings();
     });
 }
@@ -2684,7 +2685,7 @@ async function clearDomainSettings() {
         showToast(t || "Remove failed", "error");
         return;
     }
-    showToast("Domain removed — back to plain HTTP", "success");
+    showToast("Domain removed. Back to plain HTTP", "success");
     loadDomainSettings();
 }
 
@@ -2793,7 +2794,7 @@ async function createApiToken() {
         document.getElementById("new-token-secret-input").value = data.token;
         document.getElementById("new-token-secret").style.display = "block";
         nameInput.value = "";
-        showToast("Token created — copy it now", "success", 6000);
+        showToast("Token created. Copy it now", "success", 6000);
         loadTokensList();
     } catch (err) {
         showToast(err.message, "error");
@@ -2875,17 +2876,18 @@ function showCtxMenu(e, kind, id, el) {
     const m = document.getElementById("ctx-menu");
     if (!m) return;
     const rawName = (el && el.dataset && el.dataset.name) || id;
-    const q = jsq(rawName);
+    const q = ja(rawName);
+    const file = cachedFiles.find(f => f.id === id) || mediaFiles.find(f => f.id === id);
     const items = kind === "folder" ? [
         { label: "Open", icon: "folder", fn: `navigateTo('${id}', '${q}')` },
         { label: "Rename", icon: "edit", fn: `promptRenameFolder('${id}', '${q}')` },
         { label: "Move to Trash", icon: "trash-2", fn: `confirmDeleteFolder('${id}', '${q}')`, danger: true }
     ] : [
-        { label: "Preview", icon: "eye", fn: `ctxPreview('${id}')` },
+        ...(file ? [{ label: "Preview", icon: "eye", fn: `openPreview('${id}', '${q}', '${ja(file.mime_type)}', ${Number(file.size) || 0})` }] : []),
         { label: "Download", icon: "download", fn: `downloadFile('${id}')` },
         { label: "Details", icon: "info", fn: `openDetailsDrawer('${id}')` },
         { label: "Share Link", icon: "share-2", fn: `openShareModal('${id}', '${q}')` },
-        { label: "Star / Unstar", icon: "star", fn: `ctxToggleFav('${id}')` },
+        { label: favoriteIds.has(id) ? "Unstar" : "Star", icon: "star", fn: `toggleFavorite('${id}', ${!favoriteIds.has(id)})` },
         { label: "Make a copy", icon: "copy", fn: `copyFile('${id}')` },
         { label: "Rename", icon: "edit", fn: `promptRenameFile('${id}', '${q}')` },
         { label: "Move to Trash", icon: "trash-2", fn: `confirmDeleteFile('${id}', '${q}')`, danger: true }
@@ -2895,8 +2897,11 @@ function showCtxMenu(e, kind, id, el) {
     `).join("");
     m.style.display = "block";
     const w = 230, h = items.length * 42 + 40;
-    m.style.left = Math.min(e.clientX, window.innerWidth - w - 8) + "px";
-    m.style.top = Math.min(e.clientY, window.innerHeight - h - 8) + "px";
+    const keyboard = e.type === "click" && e.detail === 0;
+    const target = keyboard && e.currentTarget instanceof Element ? e.currentTarget.getBoundingClientRect() : null;
+    m.style.left = Math.max(8, Math.min(target ? target.left : e.clientX, window.innerWidth - w - 8)) + "px";
+    m.style.top = Math.max(8, Math.min(target ? target.bottom : e.clientY, window.innerHeight - h - 8)) + "px";
+    if (keyboard) m.querySelector("button")?.focus();
 }
 
 // ================= Details drawer + versions =================
@@ -2929,7 +2934,7 @@ async function openDetailsDrawer(id) {
                 <dt>Size</dt><dd>${formatSize(f.size)}</dd>
                 <dt>Type</dt><dd>${escapeHtml(f.mime_type)}</dd>
                 <dt>Modified</dt><dd>${formatDateTime(f.updated_at || f.created_at)}</dd>
-                <dt>SHA-256</dt><dd>${f.sha256 ? escapeHtml(f.sha256) : "—"}</dd>
+                <dt>SHA-256</dt><dd>${f.sha256 ? escapeHtml(f.sha256) : "…"}</dd>
                 <dt>Telegram</dt><dd>msg #${f.telegram_message_id}</dd>
                 <dt>Shares</dt><dd>${meta.shares}</dd>
                 <dt>Duplicates</dt><dd>${meta.duplicates > 0 ? meta.duplicates + " identical file(s)" : "none"}</dd>
@@ -2968,7 +2973,8 @@ async function restoreVersion(fileId, vid) {
         if (!res.ok) throw new Error("Restore failed");
         showToast("Version restored", "success");
         openDetailsDrawer(fileId);
-        loadDriveContent();
+        if (currentTab === "overview") loadOverview();
+        else loadDriveContent();
     } catch (err) {
         showToast(err.message, "error");
     }
@@ -3074,7 +3080,8 @@ async function copyFile(id) {
             throw new Error(t || "Copy failed");
         }
         showToast("Copy created", "success");
-        if (currentTab === "drive") loadDriveContent();
+        if (currentTab === "overview") loadOverview();
+        else if (currentTab === "drive") loadDriveContent();
         else if (currentTab === "media") loadMediaLibrary();
     } catch (err) {
         showToast(err.message, "error");
@@ -4013,7 +4020,7 @@ async function inspectZip(id, name, size) {
                     <div class="zip-row" ${e.dir ? "" : `onclick="previewZipEntry('${id}', ${i})" style="cursor:pointer;"`} title="${e.dir ? "Folder" : "Click to preview"}">
                         <span style="color: var(--primary);">${getIcon(e.dir ? "folder" : getFileCategory("", e.name).icon, "icon-sm")}</span>
                         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</span>
-                        <span style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap;">${e.dir ? "—" : methodLabel(e.method)}</span>
+                        <span style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap;">${e.dir ? "…" : methodLabel(e.method)}</span>
                         <span style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap;">${e.dir || e.unknownSizes ? "" : formatSize(e.usize)}</span>
                     </div>`).join("")}
             </div>
@@ -4034,15 +4041,15 @@ async function previewZipEntry(id, idx) {
     const e = (container._zipEntries || [])[idx];
     if (!e || e.dir) return;
     if (e.encrypted) {
-        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Encrypted entry — preview unavailable.</p>`;
+        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Encrypted entry. Preview unavailable.</p>`;
         return;
     }
     if (e.unknownSizes) {
-        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Entry uses a data descriptor — sizes unknown, preview unavailable.</p>`;
+        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Entry uses a data descriptor. Sizes unknown, preview unavailable.</p>`;
         return;
     }
     if (e.usize > 8 * 1024 * 1024) {
-        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Entry is larger than 8 MB — download the archive instead.</p>`;
+        box.innerHTML = `<p style="color:var(--warning);font-size:0.85rem;">Entry is larger than 8 MB. Download the archive instead.</p>`;
         return;
     }
     if (e.method !== 0 && e.method !== 8) {

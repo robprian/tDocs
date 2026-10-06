@@ -93,14 +93,16 @@ By default, tDocs scans for an available port starting at `8080` and displays bo
 - **Default Admin Password**: `admin123` (Configure via `TDOCS_ADMIN_PASSWORD`).
 
 #### Step 3: Navigating the Dashboard
-- **Overview tab** (default): storage analytics (totals, per-type gauge + breakdown), recent files, duplicate-content warnings, and quick actions.
+- **Overview tab** (default): file, folder, favorite and server metrics; five folder shortcuts; recent files; and a side panel for storage, Telegram connection and file categories. **Upload Files**, **New Folder** and **Sync Now** are available in the welcome panel. The storage ring shows category shares of stored bytes, not a percentage of a fixed quota.
 - **Dual View Modes**: Toggle between **Grid View** (visual file cards) and **Table/List View** (sorting by Name, Size, Date, with multi-select checkboxes for bulk actions).
-- **Search + filters**: Real-time search with type/size filters across your virtual drive.
+- **Search + filters**: Search from the top bar opens matching files in **My Drive**. Type and size filters are available in the drive.
 - **Upload Manager**: Floating drawer with per-file progress, **pause/resume/retry**, and duplicate-content warnings.
 - **Media Preview**: Click any file to preview pictures, stream seekable videos, play audio, view PDFs, or inspect code/text. Right-click any item for the context menu (preview, download, details, share, star, rename, trash).
 
+Overview examples: [desktop](screenshots/overview-reference-fixture.png) and [mobile](screenshots/overview-reference-mobile.png). These screenshots use isolated test metadata, not a connected Telegram account or uploaded file content.
+
 #### Step 4: Virtual Folder & File Management
-- Click **New Folder** to create hierarchical directories.
+- Click **New Folder** to create a folder. From **Overview**, it is created at the drive root; from **My Drive**, it is created inside the current folder.
 - **Star** files to pin them under **Favorites**. Open **Details** (eye icon) for metadata, version history, shares and duplicates.
 - Deleting moves items to **Trash** (restorable). **Purge** inside Trash deletes forever, including the Telegram copy. Re-uploading an existing name archives the previous copy under **Versions** automatically.
 - Bulk-select rows/cards to trash, restore, move, favorite or purge many files at once.
@@ -277,13 +279,16 @@ Secara otomatis, tDocs akan mencari port yang tersedia mulai dari `8080` dan men
 - **Password Admin Bawaan**: `admin123` (Dapat diubah melalui variabel `TDOCS_ADMIN_PASSWORD`).
 
 #### Langkah 3: Navigasi Antarmuka Web
+- **Overview** (tampilan awal): metrik file, folder, favorit dan server; lima pintasan folder; file terbaru; serta panel penyimpanan, koneksi Telegram dan kategori file. Tombol **Upload Files**, **New Folder** dan **Sync Now** tersedia di panel sambutan. Cincin penyimpanan menunjukkan proporsi ukuran tiap kategori, bukan persentase kuota tetap.
 - **Pilihan Tampilan (Dual View)**: Pilih antara **Grid View** (kartu file interaktif dengan ikon format) atau **Table/List View** (tabel detail dengan sorting instan Nama, Ukuran, dan Tanggal).
-- **Pencarian Cepat**: Cari file secara instan melalui kolom pencarian di bagian atas.
+- **Pencarian Cepat**: Pencarian dari kolom atas membuka hasil file di **My Drive**. Filter jenis dan ukuran tersedia di drive.
 - **Upload Manager**: Drawer melayang di pojok kanan bawah yang menampilkan progres unggahan per-chunk secara transparan (`Chunk 3/8`).
 - **Pratinjau Media & Kode**: Klik file apa saja untuk melihat gambar, memutar video MP4/WebM, mendengarkan lagu, membaca dokumen PDF, atau melihat file kode pemrograman (`.go`, `.py`, `.json`, `.txt`).
 
+Contoh Overview: [desktop](screenshots/overview-reference-fixture.png) dan [mobile](screenshots/overview-reference-mobile.png). Screenshot memakai metadata uji terisolasi, bukan akun Telegram yang terhubung atau isi file yang diunggah.
+
 #### Langkah 4: Manajemen Folder & Berkas Virtual
-- Klik tombol **New Folder** untuk membuat subfolder baru.
+- Klik **New Folder** untuk membuat folder. Dari **Overview**, folder dibuat di root drive; dari **My Drive**, folder dibuat di dalam folder yang sedang dibuka.
 - Pindahkan file antar folder dengan mudah (dilengkapi proteksi anti siklus agar folder tidak dapat dipindahkan ke dalam dirinya sendiri).
 - Ganti nama (*rename*) atau hapus file yang sudah tidak diperlukan.
 
