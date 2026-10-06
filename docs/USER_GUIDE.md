@@ -102,7 +102,7 @@ By default, tDocs scans for an available port starting at `8080` and displays bo
 Overview examples: [desktop](screenshots/overview-reference-fixture.png) and [mobile](screenshots/overview-reference-mobile.png). These screenshots use isolated test metadata, not a connected Telegram account or uploaded file content.
 
 #### Step 4: Virtual Folder & File Management
-- Click **New Folder** to create a folder. From **Overview**, it is created at the drive root; from **My Drive**, it is created inside the current folder.
+- Click **New Folder** to create a folder. From **Overview**, it is created at the drive root; from the **My Drive** toolbar, it is created inside the current folder. The toolbar button remains available when the folder already contains files or subfolders.
 - **Star** files to pin them under **Favorites**. Open **Details** (eye icon) for metadata, version history, shares and duplicates.
 - Deleting moves items to **Trash** (restorable). **Purge** inside Trash deletes forever, including the Telegram copy. Re-uploading an existing name archives the previous copy under **Versions** automatically.
 - Bulk-select rows/cards to trash, restore, move, favorite or purge many files at once.
@@ -288,7 +288,7 @@ Secara otomatis, tDocs akan mencari port yang tersedia mulai dari `8080` dan men
 Contoh Overview: [desktop](screenshots/overview-reference-fixture.png) dan [mobile](screenshots/overview-reference-mobile.png). Screenshot memakai metadata uji terisolasi, bukan akun Telegram yang terhubung atau isi file yang diunggah.
 
 #### Langkah 4: Manajemen Folder & Berkas Virtual
-- Klik **New Folder** untuk membuat folder. Dari **Overview**, folder dibuat di root drive; dari **My Drive**, folder dibuat di dalam folder yang sedang dibuka.
+- Klik **New Folder** untuk membuat folder. Dari **Overview**, folder dibuat di root drive; dari toolbar **My Drive**, folder dibuat di dalam folder yang sedang dibuka. Tombol toolbar tetap tersedia saat folder sudah berisi file atau subfolder.
 - Pindahkan file antar folder dengan mudah (dilengkapi proteksi anti siklus agar folder tidak dapat dipindahkan ke dalam dirinya sendiri).
 - Ganti nama (*rename*) atau hapus file yang sudah tidak diperlukan.
 

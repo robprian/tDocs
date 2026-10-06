@@ -1,6 +1,6 @@
 {
   "name": "tdocs",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "High-Capacity Cloud Storage Powered by Telegram MTProto Infrastructure",
   "main": "bin/tdocs.js",
   "bin": {
