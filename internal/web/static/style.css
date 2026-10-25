@@ -2146,3 +2146,14 @@ button.sidebar-section-label[aria-expanded="false"] .sidebar-chev { transform: r
 .ov-usage-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); }
 .ov-usage-row strong { margin-left: auto; color: var(--text-primary); font-weight: 650; white-space: nowrap; }
 .ov-usage-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; }
+
+/* Sidebar sections: wrapper participates in the nav flex layout as if
+   flat (display: contents), while collapse is a class on the wrapper —
+   so hidden items come back reliably and state persists across reloads. */
+.sidebar-section { display: contents; }
+.sidebar-section.collapsed .nav-link { display: none; }
+
+/* Drive drag & drop: file cards/rows dragged onto folder cards/rows. */
+.card.dragging, tr.dragging { opacity: 0.45; }
+.card.drop-target, tr.drop-target { outline: 2px dashed var(--primary); outline-offset: -2px; background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.card.drop-target .card-title, tr.drop-target .table-name-cell { color: var(--primary); }

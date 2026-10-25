@@ -120,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupContextMenu();
     setupShortcuts();
     initSidebarCollapse();
+    applySidebarSectionStates();
     MediaEngine.init();
     loadOverview();
     updateViewButtons();
@@ -401,6 +402,8 @@ async function switchTab(tab) {
     document.querySelectorAll(".nav-link").forEach(el => el.classList.remove("active"));
     const navEl = document.getElementById(`nav-${tab}`);
     if (navEl) navEl.classList.add("active");
+    // Never leave the active item hidden inside a collapsed section.
+    expandSidebarSectionForTab(tab);
 
     const containers = {
         overview: "overview-content-container",
@@ -645,6 +648,54 @@ function sortItems(items, field, order) {
     });
 }
 
+// --- Drive drag & drop: move files into a folder ---
+// Dragging a selected file moves the whole selection; dragging an
+// unselected file moves just that file. The move reuses the existing
+// bulk endpoint (POST /api/files/bulk, action "move").
+let driveDragIds = [];
+
+function driveDragStart(ev, fileId) {
+    driveDragIds = (selectedIds.has(fileId) && selectedIds.size > 0) ? [...selectedIds] : [fileId];
+    ev.dataTransfer.effectAllowed = "move";
+    try { ev.dataTransfer.setData("text/plain", fileId); } catch (_) {}
+    ev.currentTarget.classList.add("dragging");
+}
+
+function driveDragEnd(ev) {
+    ev.currentTarget.classList.remove("dragging");
+    driveDragIds = [];
+    document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+}
+
+function driveDragOver(ev, el) {
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+    el.classList.add("drop-target");
+}
+
+function driveDragLeave(ev, el) {
+    if (!el.contains(ev.relatedTarget)) el.classList.remove("drop-target");
+}
+
+function driveDrop(ev, folderId, folderName) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove("drop-target");
+    let ids = driveDragIds.length ? driveDragIds : [ev.dataTransfer.getData("text/plain")].filter(Boolean);
+    if (!ids.length) return;
+    // Skip files already inside the target folder (no-op moves).
+    const movable = ids.filter(id => {
+        const f = cachedFiles.find(x => x.id === id);
+        return !f || f.folder_id !== folderId;
+    });
+    if (!movable.length) {
+        showToast("Already in that folder.", "info");
+        return;
+    }
+    selectedIds = new Set(movable);
+    renderBulkBar();
+    bulkAction("move", folderId);
+}
+
 // --- Grid Rendering ---
 function renderFoldersGrid(folders) {
     const container = document.getElementById("folders-grid");
@@ -662,7 +713,7 @@ function renderFoldersGrid(folders) {
         const st = folderStats[f.id] || { files: 0, bytes: 0 };
         const pct = Math.max(st.bytes > 0 ? 4 : 0, Math.round(st.bytes / maxBytes * 100));
         return `
-        <div class="card" onclick="navigateTo('${f.id}', '${ja(f.name)}')" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${f.id}', this)">
+        <div class="card" ondragover="driveDragOver(event, this)" ondragleave="driveDragLeave(event, this)" ondrop="driveDrop(event, '${f.id}', '${ja(f.name)}')" onclick="navigateTo('${f.id}', '${ja(f.name)}')" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${f.id}', this)">
             <div class="card-top">
                 <div class="card-icon-wrap tile-blue">${getIcon("folder")}</div>
                 <div class="card-actions" onclick="event.stopPropagation()">
@@ -683,7 +734,7 @@ function fileCardHTML(f, opts = {}) {
     const fav = favoriteIds.has(f.id);
     const sel = opts.selectable === false ? "" : `<input type="checkbox" class="select-check card-select" data-id="${f.id}" ${selectedIds.has(f.id) ? "checked" : ""} onclick="event.stopPropagation(); onSelectChange()">`;
     return `
-        <div class="card" onclick="openPreview('${f.id}', '${ja(f.name)}', '${f.mime_type}', ${f.size})" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'file', '${f.id}', this)">
+        <div class="card" draggable="true" ondragstart="driveDragStart(event, '${f.id}')" ondragend="driveDragEnd(event)" title="Drag to a folder to move" onclick="openPreview('${f.id}', '${ja(f.name)}', '${f.mime_type}', ${f.size})" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'file', '${f.id}', this)">
             ${sel}
             <div class="card-top">
                 <div class="card-icon-wrap ${fileType.tile}">
@@ -747,7 +798,7 @@ function renderTableList(folders, files) {
     // Folders first
     folders.forEach(f => {
         rowsHtml += `
-            <tr onclick="navigateTo('${f.id}', '${ja(f.name)}')" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${f.id}', this)">
+            <tr ondragover="driveDragOver(event, this)" ondragleave="driveDragLeave(event, this)" ondrop="driveDrop(event, '${f.id}', '${ja(f.name)}')" onclick="navigateTo('${f.id}', '${ja(f.name)}')" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'folder', '${f.id}', this)">
                 <td>
                     <div class="table-name-cell">
                         <span style="color: var(--folder);">${getIcon("folder")}</span>
@@ -771,7 +822,7 @@ function renderTableList(folders, files) {
         const fileType = getFileCategory(f.mime_type, f.name);
         const fav = favoriteIds.has(f.id);
         rowsHtml += `
-            <tr onclick="openPreview('${f.id}', '${ja(f.name)}', '${f.mime_type}', ${f.size})" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'file', '${f.id}', this)">
+            <tr draggable="true" ondragstart="driveDragStart(event, '${f.id}')" ondragend="driveDragEnd(event)" title="Drag to a folder to move" onclick="openPreview('${f.id}', '${ja(f.name)}', '${f.mime_type}', ${f.size})" data-name="${escapeHtml(f.name)}" oncontextmenu="showCtxMenu(event, 'file', '${f.id}', this)">
                 <td onclick="event.stopPropagation()"><input type="checkbox" class="select-check" data-id="${f.id}" ${selectedIds.has(f.id) ? "checked" : ""} onchange="onSelectChange()"></td>
                 <td>
                     <div class="table-name-cell">
@@ -4837,15 +4888,49 @@ async function pollAccountBackup(id) {
 }
 
 
-// Collapse/expand one sidebar section (the nav-links up to the next label).
+// Sidebar sections: class-based collapse, persisted in localStorage.
+// The previous inline-style version lost its state on every reload and
+// could leave the active page's menu item hidden inside a collapsed
+// section; this version never hides the active item (see switchTab).
+const SIDEBAR_SECTIONS_KEY = "tdocs_sidebar_sections";
+
+function sidebarSectionStates() {
+    try { return JSON.parse(localStorage.getItem(SIDEBAR_SECTIONS_KEY) || "{}"); }
+    catch (_) { return {}; }
+}
+
+function saveSidebarSectionState(name, collapsed) {
+    const saved = sidebarSectionStates();
+    saved[name] = collapsed;
+    try { localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(saved)); }
+    catch (_) {}
+}
+
+function applySidebarSectionStates() {
+    const saved = sidebarSectionStates();
+    document.querySelectorAll(".sidebar-section").forEach(sec => {
+        const name = sec.dataset.section;
+        const collapsed = name in saved ? !!saved[name] : sec.classList.contains("collapsed");
+        sec.classList.toggle("collapsed", collapsed);
+        sec.querySelector(".sidebar-section-label")?.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+}
+
 function toggleSidebarSection(btn) {
-    const collapsed = btn.getAttribute("aria-expanded") !== "false";
+    const sec = btn.closest(".sidebar-section");
+    if (!sec) return;
+    const collapsed = !sec.classList.contains("collapsed");
+    sec.classList.toggle("collapsed", collapsed);
     btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    let el = btn.nextElementSibling;
-    while (el && !el.classList.contains("sidebar-section-label")) {
-        if (el.classList.contains("nav-link")) el.style.display = collapsed ? "none" : "";
-        el = el.nextElementSibling;
-    }
+    saveSidebarSectionState(sec.dataset.section, collapsed);
+}
+
+function expandSidebarSectionForTab(tab) {
+    const sec = document.getElementById(`nav-${tab}`)?.closest(".sidebar-section");
+    if (!sec || !sec.classList.contains("collapsed")) return;
+    sec.classList.remove("collapsed");
+    sec.querySelector(".sidebar-section-label")?.setAttribute("aria-expanded", "true");
+    saveSidebarSectionState(sec.dataset.section, false);
 }
 
 // Relative time without the "Synced" prefix, for the Synchronization card.
