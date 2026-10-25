@@ -110,6 +110,16 @@ set -e
 if [ -d /run/systemd/system ]; then
   systemctl daemon-reload >/dev/null 2>&1 || true
 fi
+# Upgrade of an already-configured install (dpkg passes the old version
+# as $2; fresh installs get no $2): the old package's prerm stopped and
+# disabled the service, so bring it back now — this runs inside apt,
+# before the old updater binary does its own post-install check, which
+# is what makes the v3.1.3 -> v3.1.4 transition self-healing. Fresh
+# installs are NOT started here; `tdocs setup` owns first start.
+if [ -n "$2" ] && [ -f /etc/tdocs/.env ]; then
+  systemctl enable tdocs.service >/dev/null 2>&1 || true
+  systemctl restart tdocs.service >/dev/null 2>&1 || true
+fi
 # Preserve an existing config; new installs start empty until `tdocs setup`.
 if [ ! -f /etc/tdocs/.env ] && [ -f /usr/share/doc/tdocs/env.example ]; then
   install -m 600 /usr/share/doc/tdocs/env.example /etc/tdocs/.env 2>/dev/null || true
@@ -122,9 +132,16 @@ chmod 755 "$PKG/DEBIAN/postinst"
 cat > "$PKG/DEBIAN/prerm" <<'EOF'
 #!/bin/sh
 set -e
-if [ -d /run/systemd/system ]; then
-  systemctl disable --now tdocs.service >/dev/null 2>&1 || true
-fi
+# dpkg passes "upgrade <new-version>" on upgrade: stopping+disabling the
+# service there leaves it down after every update (the v3.1.3 bug), since
+# postinst never started it again. Only stop+disable on real removal.
+case "$1" in
+  remove|deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl disable --now tdocs.service >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
 exit 0
 EOF
 chmod 755 "$PKG/DEBIAN/prerm"

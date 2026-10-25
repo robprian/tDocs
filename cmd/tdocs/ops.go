@@ -353,6 +353,10 @@ func runUpdate(cfg *app.Config, args []string) {
 							}
 						}
 					}
+					// Capture BEFORE the package manager runs: the .deb
+					// prerm stops+disables the service on upgrade, so a
+					// post-install check can never see the pre-update state.
+					svcBefore := captureServiceState()
 					// Auto-install via package manager (no second download).
 					if kind == app.InstallDeb {
 						fmt.Printf("  → Installing %s via apt …\n", name)
@@ -376,7 +380,7 @@ func runUpdate(cfg *app.Config, args []string) {
 						}
 					}
 					fmt.Printf("  ✓ Updated to %s via %s package\n", latest.Tag, kind)
-					restartServiceIfRunning()
+					restoreServiceAfterUpdate(svcBefore)
 					return
 				}
 			}
@@ -455,6 +459,9 @@ func runUpdate(cfg *app.Config, args []string) {
 		os.Exit(1)
 	}
 
+	// Capture before replacing the binary, so a running service is
+	// restarted after the update instead of being assumed stopped.
+	svcBefore := captureServiceState()
 	backup := exe + ".bak"
 	if err := copyFile(exe, backup); err != nil {
 		fmt.Fprintf(os.Stderr, "  ✕ Backup of current binary failed: %v\n", err)
@@ -468,7 +475,7 @@ func runUpdate(cfg *app.Config, args []string) {
 	}
 	_ = os.Chmod(exe, 0o755)
 	fmt.Printf("  ✓ Updated %s → %s (backup: %s)\n", exe, latest.Tag, backup)
-	restartServiceIfRunning()
+	restoreServiceAfterUpdate(svcBefore)
 	fmt.Println("  ○ Database and configuration were not modified.")
 }
 

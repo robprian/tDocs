@@ -16,17 +16,61 @@ func restartCommand(userMode bool, uid int) (string, []string) {
 	return "sudo", []string{"systemctl", "restart", "tdocs.service"}
 }
 
-// restartServiceIfRunning restarts the system tdocs.service when it is
-// currently active, and reports what it did. It never fails the update:
-// a failed restart is reported as a warning with the manual command, and
-// a service that is not running is simply left alone.
-func restartServiceIfRunning() {
+// serviceState is the pre-update state of the system tdocs.service.
+// It MUST be captured BEFORE the package install: the .deb prerm (pre
+// v3.1.4) runs `systemctl disable --now tdocs.service` on upgrade, so a
+// check taken after apt always sees a stopped service — even one that was
+// running fine before the update — and the updater then wrongly concludes
+// "no restart needed" while leaving the service down and disabled.
+type serviceState struct {
+	managed bool // systemctl exists
+	active  bool // is-active at capture time
+	enabled bool // is-enabled at capture time
+}
+
+func captureServiceState() serviceState {
 	if _, err := exec.LookPath("systemctl"); err != nil {
+		return serviceState{}
+	}
+	return serviceState{
+		managed: true,
+		active:  exec.Command("systemctl", "is-active", "--quiet", "tdocs.service").Run() == nil,
+		enabled: exec.Command("systemctl", "is-enabled", "--quiet", "tdocs.service").Run() == nil,
+	}
+}
+
+// decideServiceAction maps a captured state to what restore must do:
+// re-enable exactly when it was enabled, restart exactly when it was
+// active. A stopped-but-enabled service is re-enabled but NOT started;
+// a never-managed service is left alone.
+func decideServiceAction(s serviceState) (enable, restart bool) {
+	return s.enabled, s.active
+}
+
+// restoreServiceAfterUpdate brings the service back to its pre-update
+// state. It never fails the update: failures are reported as warnings
+// with the manual command.
+func restoreServiceAfterUpdate(s serviceState) {
+	if !s.managed {
 		fmt.Println("  ○ Restart the service if running: sudo systemctl restart tdocs")
 		return
 	}
-	if exec.Command("systemctl", "is-active", "--quiet", "tdocs.service").Run() != nil {
-		fmt.Println("  ○ tdocs service is not running — no restart needed.")
+	enable, restart := decideServiceAction(s)
+	if !enable && !restart {
+		fmt.Println("  ○ tdocs service was not running before the update — left stopped.")
+		return
+	}
+	if enable {
+		name, args := "systemctl", []string{"enable", "tdocs.service"}
+		if os.Geteuid() != 0 {
+			name, args = "sudo", []string{"systemctl", "enable", "tdocs.service"}
+		}
+		if err := exec.Command(name, args...).Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "  ○ Could not re-enable tdocs service: %v\n    Enable manually: sudo systemctl enable tdocs\n", err)
+		}
+	}
+	if !restart {
+		fmt.Println("  ✓ tdocs service re-enabled (it was stopped before the update).")
 		return
 	}
 	name, args := restartCommand(false, os.Geteuid())

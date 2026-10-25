@@ -26,6 +26,28 @@ func TestMakePackageReadableForApt(t *testing.T) {
 	}
 }
 
+func TestDecideServiceAction(t *testing.T) {
+	cases := []struct {
+		name        string
+		in          serviceState
+		wantEnable  bool
+		wantRestart bool
+	}{
+		{"running+enabled restarts and re-enables", serviceState{managed: true, active: true, enabled: true}, true, true},
+		{"running but not enabled restarts without enabling", serviceState{managed: true, active: true}, false, true},
+		{"stopped but enabled re-enables without starting", serviceState{managed: true, enabled: true}, true, false},
+		{"stopped and disabled is left alone", serviceState{managed: true}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotEnable, gotRestart := decideServiceAction(tc.in)
+			if gotEnable != tc.wantEnable || gotRestart != tc.wantRestart {
+				t.Fatalf("decideServiceAction(%+v) = (%v, %v), want (%v, %v)", tc.in, gotEnable, gotRestart, tc.wantEnable, tc.wantRestart)
+			}
+		})
+	}
+}
+
 func TestMakePackageReadableForAptMissingFileDoesNotPanic(t *testing.T) {
 	// A missing file must only warn on stderr, never crash the updater.
 	makePackageReadableForApt(t.TempDir(), filepath.Join(t.TempDir(), "nope.deb"))
