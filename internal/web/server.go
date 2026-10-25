@@ -65,6 +65,21 @@ type Server struct {
 	tlsMu  sync.Mutex
 	tls    *autoTLS
 	tlsErr string
+
+	// Additional Telegram accounts (backup targets). Nil when the server
+	// was started without Telegram app credentials; handlers then 503.
+	accounts *telegram.AccountRegistry
+
+	// In-memory backup-job progress, keyed by account ID.
+	backupMu   sync.Mutex
+	backupJobs map[string]*backupJob
+}
+
+// SetAccountRegistry wires the additional-Telegram-account registry after
+// NewServer. It is a setter (not a constructor argument) so existing
+// NewServer callers and tests keep working unchanged.
+func (s *Server) SetAccountRegistry(reg *telegram.AccountRegistry) {
+	s.accounts = reg
 }
 
 func NewServer(cfg *app.Config, database *db.DB, tgManager *telegram.ClientManager) (*Server, error) {
@@ -93,6 +108,7 @@ func NewServer(cfg *app.Config, database *db.DB, tgManager *telegram.ClientManag
 		mux:            http.NewServeMux(),
 		templates:      tmpl,
 		unlockedTokens: make(map[string]time.Time),
+		backupJobs:     make(map[string]*backupJob),
 		startedAt:      time.Now(),
 		uploadHash:     make(map[string]*hashEntry),
 	}
@@ -217,6 +233,19 @@ func (s *Server) routes() {
 	// these endpoints can drive an MTProto login or reconfigure the storage
 	// backend, so they are superuser-only — API tokens and share guests get
 	// 403 regardless of what the UI happens to render.
+	// Additional Telegram accounts (backup targets). Same superuser-only
+	// rule as the wizard: these endpoints can pair new phone numbers and
+	// copy library bytes to other accounts' channels.
+	s.mux.HandleFunc("GET /api/telegram/accounts", s.superuserOnly(s.handleTelegramAccounts))
+	s.mux.HandleFunc("POST /api/telegram/accounts", s.superuserOnly(s.handleTelegramAccounts))
+	s.mux.HandleFunc("DELETE /api/telegram/accounts/{id}", s.superuserOnly(s.handleTelegramAccountDelete))
+	s.mux.HandleFunc("POST /api/telegram/accounts/{id}/wizard/start", s.superuserOnly(s.handleTelegramAccountWizardStart))
+	s.mux.HandleFunc("POST /api/telegram/accounts/{id}/refresh", s.superuserOnly(s.handleTelegramAccountRefresh))
+	s.mux.HandleFunc("POST /api/telegram/accounts/{id}/backup", s.superuserOnly(s.handleTelegramAccountBackup))
+	s.mux.HandleFunc("GET /api/telegram/accounts/{id}/backup/status", s.superuserOnly(s.handleTelegramAccountBackupStatus))
+	s.mux.HandleFunc("GET /api/telegram/mirror", s.superuserOnly(s.handleTelegramMirror))
+	s.mux.HandleFunc("POST /api/telegram/mirror", s.superuserOnly(s.handleTelegramMirror))
+
 	s.mux.HandleFunc("POST /api/telegram/wizard/start", s.superuserOnly(s.handleTelegramWizardStart))
 	s.mux.HandleFunc("GET /api/telegram/wizard/status", s.superuserOnly(s.handleTelegramWizardStatus))
 	s.mux.HandleFunc("POST /api/telegram/wizard/submit", s.superuserOnly(s.handleTelegramWizardSubmit))

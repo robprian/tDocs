@@ -1658,11 +1658,12 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
 }
 .recent-view-btn.active { background: var(--bg-surface); color: var(--primary); box-shadow: var(--shadow-sm); }
 .recent-cols {
-  display: grid; grid-template-columns: 34px minmax(0,1fr) 245px 125px 44px 28px; gap: 10px; padding: 6px 0 8px;
+  display: grid; grid-template-columns: 34px minmax(0,1fr) 90px 175px 85px 32px 28px; gap: 10px; padding: 6px 0 8px;
   font-size: 0.72rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.02em;
 }
 .recent-cols span:first-child { grid-column: 1 / 3; padding-left: 48px; }
-#ov-recent-list .recent-row { display: grid; grid-template-columns: 34px minmax(0,1fr) 245px 125px 44px 28px; align-items: center; gap: 10px; padding: 5px 0; min-height: 40px; }
+#ov-recent-list .recent-row { display: grid; grid-template-columns: 34px minmax(0,1fr) 90px 175px 85px 32px 28px; align-items: center; gap: 10px; padding: 5px 0; min-height: 40px; }
+#ov-recent-list .recent-row .rtype { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recent-file-name { display: flex; flex-direction: column; min-width: 0; background: transparent; border: none; font: inherit; text-align: left; color: inherit; cursor: pointer; }
 #ov-recent-list .type-tile { width: 34px; height: 34px; border-radius: 9px; }
 #ov-recent-list .tile-audio { background: var(--doc-soft); color: var(--primary); }
@@ -1838,7 +1839,7 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   #ov-stat-cards .stat-card-detail { gap: 10px; }
   .stat-icon { width: 38px; height: 38px; }
   .folder-open { padding-left: 16px; padding-right: 16px; }
-  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 150px 85px 28px 28px; }
+  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 80px 130px 75px 28px 28px; }
 }
 @media (max-width: 1280px) and (min-width: 1025px) {
   .welcome-art { display: none; }
@@ -1847,8 +1848,8 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   .quick-access-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .folder-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #ov-stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 85px 28px 28px; }
-  .recent-cols span:nth-child(2), #ov-recent-list .recent-row .rmeta:nth-child(3) { display: none; }
+  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 150px 85px 28px 28px; }
+  .recent-cols span:nth-child(2), #ov-recent-list .recent-row .rtype { display: none; }
 }
 @media (max-width: 1024px) {
   .welcome-note { display: none; }
@@ -1879,7 +1880,7 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   .welcome-copy { flex-shrink: 1; }
   .welcome-art { flex-basis: 35%; }
   .welcome-actions .btn { padding: 0 16px; }
-  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 170px 90px 28px 28px; }
+  .recent-cols, #ov-recent-list .recent-row { grid-template-columns: 34px minmax(0,1fr) 80px 130px 80px 28px 28px; }
   .mini-player { width: calc(100vw - 24px); gap: 10px; }
   .mp-info { width: 150px; }
 }
@@ -1951,7 +1952,7 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   .recent-view-btn { width: 44px; height: 44px; }
   .recent-cols { display: none; }
   #ov-recent-list .recent-row { grid-template-columns: 30px minmax(0,1fr) 44px 44px; gap: 4px; min-height: 52px; }
-  #ov-recent-list .recent-row .rmeta { display: none; }
+  #ov-recent-list .recent-row .rmeta, #ov-recent-list .recent-row .rtype { display: none; }
   #ov-recent-list .type-tile { width: 30px; height: 30px; }
   #ov-recent-list .rname { font-size: 0.82rem; }
   .recent-file-name, .recent-star { min-height: 44px; }
@@ -1977,44 +1978,43 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   .data-table { min-width: 560px; }
 }
 
-/* ------------------------------------------- overview fit: one desktop screen --- */
-/* Goal: the Overview tab fits one desktop viewport with NO page scroll.
-   Scope is deliberately narrow: desktop (>=1025px) + Overview tab only, so
-   every other tab keeps its own scrolling behaviour and every mobile rule
-   below/above (<=1024px, drawer sidebar, stacked columns, 44px targets)
-   is untouched. The only internal scrollers are safety valves for short
-   viewports: #ov-recent-list (and, as a last resort, .right-rail). On a
-   normal-height desktop viewport both fit without scrolling.
-   Why the old layout scrolled: .content-area carried a 140px bottom
-   padding, the hero was 216px tall, stat cards 114px, and both overview
-   columns grew naturally (align-items: start) with no height bound, so
-   Recent + My Folders + Storage + Telegram + Upload + Activity always
-   exceeded the viewport. */
+/* ------------------------------------------- overview: natural flow, nothing clipped --- */
+/* Goal (revised 2026-10-25, reference screenshot): the Overview tab shows
+   every section at its natural size — nothing clipped inside a card, and
+   nothing hidden to force a fit. The previous 100dvh lock did the opposite
+   on real laptops: it cut the page off and hid My Folders / Recent Activity
+   on short viewports, which read as "kepotong". So desktop Overview now
+   flows naturally: compact spacing (the old 140px bottom padding is gone,
+   hero/stats/quick are compressed) keeps it close to one screen on tall
+   viewports, and on short viewports the PAGE scrolls cleanly instead of
+   any panel clipping or disappearing. Scope stays narrow: desktop
+   (>=1025px) + Overview tab only; mobile rules (<=1024px) are untouched.
+   Why the old layout scrolled excessively: .content-area carried a 140px
+   bottom padding, the hero was 216px tall, stat cards 114px, and both
+   overview columns grew naturally, so Recent + My Folders + Storage +
+   Telegram + Upload + Activity always exceeded the viewport. */
 @media (min-width: 1025px) {
-  body[data-active-tab="overview"] { height: 100dvh; overflow: hidden; }
-  body[data-active-tab="overview"] .layout-shell { height: 100dvh; }
+  body[data-active-tab="overview"] { height: auto; overflow: visible; }
+  body[data-active-tab="overview"] .layout-shell { height: auto; }
   body[data-active-tab="overview"] .content-area {
-    /* Height 100% of the grid row, not calc(100dvh - header): the header's
-       real height can exceed --header-h by a few px, and the calc version
-       overflowed the shell by exactly that amount. */
-    height: 100%;
+    height: auto;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     /* The old 140px bottom padding was the single largest scroll driver.
        The mini-player / upload drawer are fixed overlays, not in-flow
        content, so they need no in-flow clearance here. */
     padding: 0 11px 12px 18px;
   }
-  body[data-active-tab="overview"] #overview-content-container { height: 100%; min-height: 0; }
-  body[data-active-tab="overview"] .overview-cols { height: 100%; min-height: 0; align-items: stretch; gap: 14px; }
-  body[data-active-tab="overview"] .overview-main { height: 100%; min-height: 0; gap: 12px; }
-  body[data-active-tab="overview"] .right-rail { height: 100%; min-height: 0; gap: 10px; overflow-y: auto; padding-bottom: 2px; }
-  /* Only Recent may shrink: every other main-column panel keeps its
-     natural height (flex: none), so cards never squash and spill their
-     content over the next card. Recent takes the remaining space. */
+  body[data-active-tab="overview"] #overview-content-container { height: auto; min-height: 0; }
+  body[data-active-tab="overview"] .overview-cols { height: auto; min-height: 0; align-items: start; gap: 14px; }
+  body[data-active-tab="overview"] .overview-main { height: auto; min-height: 0; gap: 12px; }
+  body[data-active-tab="overview"] .right-rail { height: auto; min-height: 0; gap: 10px; overflow: visible; padding-bottom: 2px; }
+  /* Every main-column panel keeps its natural height (flex: none), so
+     cards never squash and spill their content over the next card. */
   body[data-active-tab="overview"] .overview-main > .welcome-banner,
   body[data-active-tab="overview"] .overview-main > #ov-stat-cards,
   body[data-active-tab="overview"] .overview-main > .quick-access-panel,
+  body[data-active-tab="overview"] .overview-main > .recent-panel,
   body[data-active-tab="overview"] .overview-main > .folders-panel { flex: none; }
   body[data-active-tab="overview"] .right-rail > .rail-card { flex-shrink: 0; }
 
@@ -2032,20 +2032,16 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   body[data-active-tab="overview"] .quick-access-icon { width: 40px; height: 40px; }
   body[data-active-tab="overview"] .quick-access-icon .icon { width: 20px; height: 20px; }
 
-  /* Recent is the flex filler: it takes whatever height is left, and only
-     its own list scrolls internally when rows exceed that space.
-     flex: 1 1 auto (NOT flex: 1) matters: flex: 1 sets basis 0, so on a
-     short viewport Recent collapsed to the leftover 24px and its list
-     spilled under My Folders. With basis auto it shrinks from its natural
-     height and keeps a usable height. */
+  /* Recent flows at its natural height like every other panel: no
+     internal scroller, so rows are never clipped by a forced height. */
   body[data-active-tab="overview"] .recent-panel {
     display: flex; flex-direction: column;
-    flex: 1 1 auto; min-height: 160px;
+    flex: none;
     padding: 12px 20px 10px;
   }
   body[data-active-tab="overview"] .recent-head { flex: none; }
   body[data-active-tab="overview"] .recent-cols { flex: none; }
-  body[data-active-tab="overview"] #ov-recent-list { flex: 1; min-height: 0; overflow-y: auto; }
+  body[data-active-tab="overview"] #ov-recent-list { flex: none; min-height: 0; overflow: visible; }
 
   /* My Folders stays visible, but as a compact single row strip. */
   body[data-active-tab="overview"] .folders-panel { flex: none; padding: 12px 16px; }
@@ -2054,25 +2050,27 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   body[data-active-tab="overview"] .folder-open { min-height: 96px; padding: 10px 16px; }
   body[data-active-tab="overview"] .folder-glyph { width: 44px; height: 40px; }
 
-  /* Right rail: same cards, smaller register, no 300px storage minimum. */
+  /* Right rail: same cards, smaller register, no 300px storage minimum.
+     The gauge keeps its base size so the center value never crowds: the
+     "Unlimited" word was removed from the gauge center (it lives in the
+     legend as Capacity), leaving size + "used" only, like the reference. */
   body[data-active-tab="overview"] .rail-card { padding: 14px 16px; }
   body[data-active-tab="overview"] .rail-storage { min-height: 0; }
-  body[data-active-tab="overview"] .rail-gauge { width: 118px; height: 118px; }
+  body[data-active-tab="overview"] .rail-gauge { width: 154px; height: 154px; }
   body[data-active-tab="overview"] .storage-legend { gap: 6px; margin-top: 10px; }
+  body[data-active-tab="overview"] .storage-legend-row strong { white-space: nowrap; }
   body[data-active-tab="overview"] .rail-dropzone { min-height: 104px; padding: 10px; }
   body[data-active-tab="overview"] .telegram-actions { margin-top: 10px; }
   body[data-active-tab="overview"] .activity-entry { padding: 7px 0; }
 }
 
-/* Short desktop viewports (e.g. 1366x768): squeeze one more step so the
-   Recent list still shows several rows before its internal scroll kicks in.
-   The hero artwork and note are decorative, so they go first on short
-   screens; all copy and actions stay. */
+/* Short desktop viewports (e.g. 1366x768): compress one more step, but
+   NOTHING is hidden anymore — hiding My Folders / Recent Activity / hero
+   art to force a fit is exactly what read as "kepotong". The page may
+   scroll on a short screen; every section stays reachable and intact. */
 @media (min-width: 1025px) and (max-height: 820px) {
   body[data-active-tab="overview"] .welcome-banner { padding: 12px 20px; }
-  body[data-active-tab="overview"] .welcome-art,
-  body[data-active-tab="overview"] .welcome-note { display: none; }
-  body[data-active-tab="overview"] .welcome-copy { max-width: 100%; }
+  body[data-active-tab="overview"] .welcome-illustration { height: 120px; }
   body[data-active-tab="overview"] .welcome-copy h1 { font-size: 1.5rem; }
   body[data-active-tab="overview"] .welcome-copy p { margin-top: 4px; }
   body[data-active-tab="overview"] .welcome-actions { margin-top: 12px; }
@@ -2083,14 +2081,34 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
   body[data-active-tab="overview"] .folders-panel { padding: 10px 16px; }
   body[data-active-tab="overview"] .folder-open { min-height: 76px; }
   body[data-active-tab="overview"] .rail-card { padding: 12px 16px; }
-  body[data-active-tab="overview"] .rail-gauge { width: 96px; height: 96px; }
+  body[data-active-tab="overview"] .rail-gauge { width: 140px; height: 140px; }
   body[data-active-tab="overview"] .rail-dropzone { min-height: 80px; }
   body[data-active-tab="overview"] .activity-entry { padding: 5px 0; }
-  /* Short screens cannot fit everything at readable size: drop the two
-     shortcut sections whose content is one click away elsewhere (folders
-     via Drive, activity via Settings). This is what frees Recent to a
-     usable height instead of collapsing to header-only. Follows the
-     existing pattern of hiding welcome-art/note at narrower widths. */
-  body[data-active-tab="overview"] #ov-folders-section,
-  body[data-active-tab="overview"] .rail-activity { display: none; }
 }
+
+/* Overview Telegram Accounts card (matches the multi-account reference) */
+.rail-accounts .rail-card-title { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; }
+.rail-accounts .rail-card-title > .icon { width: 34px; height: 34px; padding: 6px; color: #fff; background: #08ace5; border-radius: 50%; }
+.ov-account-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.ov-account-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+.ov-avatar { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 800; font-size: 0.85rem; }
+.ov-account-main { flex: 1; min-width: 0; }
+.ov-account-name { font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ov-account-sub { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-account-sync { font-size: 0.78rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+.ov-badge { font-size: 0.66rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.ov-badge-primary { color: #0e7a3d; background: #e3f5e9; }
+.ov-badge-mirror { color: #2f6fed; background: #e8f0fe; }
+.ov-acct-menu { position: absolute; right: 0; top: 100%; z-index: 10; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+.ov-acct-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary); }
+.ov-acct-menu button:hover { background: var(--bg-hover); }
+.ov-mirror-row { display: flex; align-items: center; gap: 12px; }
+.ov-mirror-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ov-mirror-text strong { font-size: 0.9rem; }
+.ov-mirror-text span { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.35; }
+.ov-switch { position: relative; flex: none; cursor: pointer; }
+.ov-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.ov-switch-track { display: block; width: 46px; height: 26px; border-radius: 999px; background: var(--track); position: relative; transition: background 0.15s; }
+.ov-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.15s; }
+.ov-switch input:checked + .ov-switch-track { background: #2f7bff; }
+.ov-switch input:checked + .ov-switch-track::after { transform: translateX(20px); }

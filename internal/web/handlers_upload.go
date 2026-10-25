@@ -259,6 +259,12 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.DeleteUploadSession(session.ID)
 	s.audit(r, "upload_complete", fmt.Sprintf("%s (%d bytes)", file.Name, file.Size))
 
+	// Multi-account Mirror: when enabled, copy the new file to every
+	// ready backup account in the background. Fire-and-forget on
+	// purpose — a mirror failure must never fail the upload itself,
+	// and the job records its own errors for the Sync Center to show.
+	go s.maybeMirrorNewFile(*file)
+
 	// Duplicate hint without breaking the file-record contract: clients that
 	// care read X-Duplicate-Of; GET /api/duplicates lists the group.
 	if shaHex != "" {

@@ -310,6 +310,17 @@ func runServer(cfg *app.Config) {
 		return
 	}
 
+	// Additional Telegram accounts (backup targets). The registry owns
+	// one MTProto runner per registered account with a session; accounts
+	// still pending login start their runner when their wizard starts.
+	if appID != 0 && appHash != "" {
+		reg := telegram.NewAccountRegistry(database, appID, appHash, cfg.SecretKey)
+		srv.SetAccountRegistry(reg)
+		if err := reg.StartAll(); err != nil {
+			fmt.Fprintf(os.Stderr, "  ○ Telegram backup accounts could not start: %v\n", err)
+		}
+	}
+
 	// Resume built-in HTTPS when a custom domain was saved in Settings.
 	srv.StartAutoTLSFromSettings(ctx)
 

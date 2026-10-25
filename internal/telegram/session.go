@@ -13,9 +13,14 @@ import (
 )
 
 // EncryptedSessionStorage implements session.Storage using SQLite and AES-256-GCM.
+// Each Telegram account gets its own settings key, so additional accounts
+// never overwrite the primary account's session: the primary account keeps
+// the legacy "telegram_session" key, additional accounts use
+// "telegram_session_<accountID>".
 type EncryptedSessionStorage struct {
 	db        *db.DB
 	secretKey []byte
+	key       string
 
 	// mu guards loaded, the ciphertext this process last read or wrote.
 	// `tdocs login` runs as a separate process against the same database, so
@@ -28,9 +33,20 @@ type EncryptedSessionStorage struct {
 }
 
 func NewEncryptedSessionStorage(database *db.DB, secretKey string) *EncryptedSessionStorage {
+	return NewEncryptedSessionStorageForKey(database, secretKey, "telegram_session")
+}
+
+// NewEncryptedSessionStorageForKey is NewEncryptedSessionStorage for one
+// named account. The key must be unique per account; the primary account
+// always uses "telegram_session" for backward compatibility.
+func NewEncryptedSessionStorageForKey(database *db.DB, secretKey, key string) *EncryptedSessionStorage {
+	if key == "" {
+		key = "telegram_session"
+	}
 	return &EncryptedSessionStorage{
 		db:        database,
 		secretKey: crypto.DeriveKey(secretKey),
+		key:       key,
 	}
 }
 
@@ -41,7 +57,7 @@ func legacyDefaultKey() []byte {
 }
 
 func (s *EncryptedSessionStorage) LoadSession(ctx context.Context) ([]byte, error) {
-	val, err := s.db.GetSetting("telegram_session")
+	val, err := s.db.GetSetting(s.key)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.remember("")
@@ -81,9 +97,9 @@ func (s *EncryptedSessionStorage) StoreSession(ctx context.Context, data []byte)
 	if s.observed {
 		var result sql.Result
 		if s.loaded == "" {
-			result, err = s.db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('telegram_session', ?)", encrypted)
+			result, err = s.db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", s.key, encrypted)
 		} else {
-			result, err = s.db.Exec("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'telegram_session' AND value = ?", encrypted, s.loaded)
+			result, err = s.db.Exec("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND value = ?", encrypted, s.key, s.loaded)
 		}
 		if err != nil {
 			return err
@@ -95,7 +111,7 @@ func (s *EncryptedSessionStorage) StoreSession(ctx context.Context, data []byte)
 		if changed == 0 {
 			return nil
 		}
-	} else if err := s.db.SetSetting("telegram_session", encrypted); err != nil {
+	} else if err := s.db.SetSetting(s.key, encrypted); err != nil {
 		return err
 	}
 	s.loaded = encrypted
@@ -119,7 +135,7 @@ func (s *EncryptedSessionStorage) replacedLocked() bool {
 	if !s.observed {
 		return false
 	}
-	current, err := s.db.GetSetting("telegram_session")
+	current, err := s.db.GetSetting(s.key)
 	if errors.Is(err, sql.ErrNoRows) {
 		current = ""
 	} else if err != nil {

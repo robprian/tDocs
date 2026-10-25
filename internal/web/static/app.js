@@ -2181,9 +2181,9 @@ function renderOverviewMetrics(s) {
             <span class="stat-icon stat-icon-files">${getIcon("folder")}</span><div class="stat-detail"><span class="stat-label">Total Files</span><span class="stat-value">${count(s.files)}</span><span class="stat-sub">${count(s.folders)} folders</span></div>
             <img class="metric-folder-art" src="/static/folder-metric.webp" alt="" width="72" height="68">
         </div>
-        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-storage">${getIcon("database")}</span><div class="stat-detail"><span class="stat-label">Storage Used</span><span class="stat-value">${size(s.bytes)}</span><span class="stat-sub">Unlimited capacity</span></div></div>
+        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-storage">${getIcon("database")}</span><div class="stat-detail"><span class="stat-label">Storage Used</span><span class="stat-value">${size(s.bytes)}</span><span class="stat-sub">of Unlimited</span></div></div>
         <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-favorites">${getIcon("star")}</span><div class="stat-detail"><span class="stat-label">Favorites</span><span class="stat-value">${count(s.favorites)}</span><span class="stat-sub">Starred files</span></div></div>
-        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-uptime">${getIcon("clock")}</span><div class="stat-detail"><span class="stat-label">Uptime</span><span class="stat-value">${typeof s.uptime_seconds === "number" ? formatDuration(s.uptime_seconds) : "Unavailable"}</span><span class="stat-sub" style="color:${health ? health.color : "var(--text-muted)"}">Telegram: ${escapeHtml(healthText)}</span></div></div>`;
+        <div class="stat-card stat-card-detail"><span class="stat-icon stat-icon-uptime">${getIcon("clock")}</span><div class="stat-detail"><span class="stat-label">Uptime</span><span class="stat-value">${typeof s.uptime_seconds === "number" ? formatDuration(s.uptime_seconds) : "Unavailable"}</span><span class="stat-sub" style="color:${health ? health.color : "var(--text-muted)"}">● Telegram: ${escapeHtml(healthText)}</span></div></div>`;
 }
 
 async function loadOverview() {
@@ -2232,14 +2232,17 @@ async function loadOverview() {
         }
 
         renderOverviewMetrics(s);
+        renderOverviewAccounts();
 
         const stored = typeof s.bytes === "number" ? formatSize(s.bytes) : "Unavailable";
-        ["ov-used", "ov-legend-used", "sidebar-used"].forEach(id => {
+        ["ov-used", "ov-legend-used"].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = stored;
         });
+        const sidebarUsed = document.getElementById("sidebar-used");
+        if (sidebarUsed) sidebarUsed.textContent = stored === "Unavailable" ? stored : `${stored} used`;
         const note = document.getElementById("sidebar-storage-note");
-        if (note) note.textContent = "used · Unlimited";
+        if (note) note.textContent = "of Unlimited";
         const cats = s.breakdown || [];
         const gauge = document.getElementById("ov-gauge");
         if (gauge) {
@@ -2290,10 +2293,13 @@ async function loadOverview() {
                 ? `<div class="dashboard-empty"><span class="empty-file-icon" aria-hidden="true">${getIcon("file-text")}${getIcon("search", "empty-search-icon")}</span><strong>No files yet</strong><p>Upload files to get started. Your recent files will appear here.</p><button class="btn btn-primary btn-sm" onclick="openFilePicker()">${getIcon("upload", "icon-sm")}Upload Files</button></div>`
                 : files.map(f => {
                     const cat = getFileCategory(f.mime_type, f.name);
+                    const mime = (f.mime_type || "").toLowerCase();
+                    const typeLabel = mime.startsWith("image/") ? "Image" : mime.startsWith("video/") ? "Video" : mime.startsWith("audio/") ? "Audio" : mime === "application/pdf" ? "PDF" : (f.name.split(".").pop() || "").toUpperCase();
                     return `
                     <div class="recent-row" data-name="${escapeHtml(f.name)}" onclick="openPreview('${ja(f.id)}', '${ja(f.name)}', '${ja(f.mime_type)}', ${Number(f.size) || 0})">
                         <span class="type-tile ${cat.tile}">${getIcon(cat.icon, "icon-sm")}</span>
                         <button type="button" class="recent-file-name" onclick="event.stopPropagation(); openPreview('${ja(f.id)}', '${ja(f.name)}', '${ja(f.mime_type)}', ${Number(f.size) || 0})" aria-label="Preview ${escapeHtml(f.name)}"><span class="rname" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span></button>
+                        <span class="rtype">${escapeHtml(typeLabel)}</span>
                         <span class="rmeta">${formatDateTime(f.updated_at || f.created_at)}</span>
                         <span class="rmeta">${formatSize(f.size)}</span>
                         <button type="button" data-file-id="${escapeHtml(f.id)}" class="recent-star ${favoriteIds.has(f.id) ? 'is-favorite' : ''}" onclick="event.stopPropagation(); toggleFavorite('${ja(f.id)}', ${!favoriteIds.has(f.id)})" aria-pressed="${favoriteIds.has(f.id)}" aria-label="${favoriteIds.has(f.id) ? "Unfavorite" : "Favorite"} ${escapeHtml(f.name)}" title="${favoriteIds.has(f.id) ? "Unfavorite" : "Favorite"}">${getIcon("star", "icon-sm")}</button>
@@ -2562,6 +2568,7 @@ async function loadStorageCenter() {
     } catch (err) {
         showToast("Sync Center failed: " + err.message, "error");
     }
+    loadTelegramAccounts();
 }
 
 async function syncCenterNow() {
@@ -4214,6 +4221,8 @@ async function withBtnLoading(btn, fn) {
 // ================= Telegram Wizard (browser) =================
 const TgWizard = {
     id: null,
+    accountId: null,
+    accountPhone: "",
     pollHandle: null,
     phone: "",
     resendAt: 0,
@@ -4234,7 +4243,10 @@ const TgWizard = {
         this._showError("", "phone");
         this._setStep("phone");
         this._setSteps(["phone", "code", "password", "verify"], 0);
-        try {
+        if (this.accountId) {
+            const phoneEl = document.getElementById("tg-wiz-phone");
+            if (phoneEl) phoneEl.value = this.accountPhone || "";
+        } else try {
             const res = await apiFetch("/api/telegram/wizard/needed");
             const data = await res.json().catch(() => ({}));
             if (res.status === 403) {
@@ -4265,6 +4277,8 @@ const TgWizard = {
     },
 
     close() {
+        this.accountId = null;
+        this.accountPhone = "";
         const modal = document.getElementById("tg-wizard-modal");
         if (modal) modal.style.display = "none";
         this._stopPolling();
@@ -4425,6 +4439,39 @@ const TgWizard = {
 
     async _verifyLive(authWarning) {
         if (this.verifyRan) return;
+        if (this.accountId) {
+            this.verifyRan = true;
+            this._showError("", "verify");
+            this._renderVerify([{ state: "run", text: "Checking backup account channel…" }]);
+            document.getElementById("tg-wiz-action-text").textContent = "Verifying…";
+            const btn = document.getElementById("tg-wiz-action");
+            if (btn) btn.disabled = true;
+            try {
+                const res = await apiFetch(`/api/telegram/accounts/${encodeURIComponent(this.accountId)}/refresh`, { method: "POST" });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.channel_id) {
+                    this._renderVerify([
+                        { state: "ok", text: "Authentication valid" },
+                        { state: "ok", text: "Backup channel bound" },
+                        { state: "ok", text: "Session stored on this server" },
+                    ]);
+                    this._finish("");
+                    return;
+                }
+                this._renderVerify([{ state: "bad", text: "Backup channel not bound yet" }]);
+                this._showError("The account paired but no backup channel was bound. Press Verify again, or re-run the wizard.", "verify");
+                document.getElementById("tg-wiz-action-text").textContent = "Retry Verify";
+                if (btn) btn.disabled = false;
+                this.verifyRan = false;
+            } catch (e) {
+                this._renderVerify([{ state: "bad", text: "Live probe failed: " + (e.message || "network error") }]);
+                this._showError(e.message || "Network error", "verify");
+                document.getElementById("tg-wiz-action-text").textContent = "Retry Verify";
+                if (btn) btn.disabled = false;
+                this.verifyRan = false;
+            }
+            return;
+        }
         this.verifyRan = true;
         this._showError("", "verify");
         this._renderVerify([
@@ -4494,6 +4541,11 @@ const TgWizard = {
         }
         refreshStatus();
         checkTelegramSetup();
+        if (this.accountId) {
+            this.accountId = null;
+            this.accountPhone = "";
+            if (typeof loadTelegramAccounts === "function") loadTelegramAccounts();
+        }
     },
 
     async _submit(payload) {
@@ -4593,7 +4645,8 @@ const TgWizard = {
             if (btn) btn.disabled = true;
             document.getElementById("tg-wiz-action-text").textContent = "Sending\u2026";
             try {
-                const res = await apiFetch("/api/telegram/wizard/start", {
+                const startUrl = this.accountId ? `/api/telegram/accounts/${encodeURIComponent(this.accountId)}/wizard/start` : "/api/telegram/wizard/start";
+                const res = await apiFetch(startUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ phone })
@@ -4670,6 +4723,188 @@ const TgWizard = {
         }
     }
 };
+
+
+// ------------------------------------------------------- telegram accounts ---
+async function loadTelegramAccounts() {
+    const box = document.getElementById("tg-accounts-list");
+    if (!box) return;
+    try {
+        const res = await apiFetch("/api/telegram/accounts");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            box.innerHTML = `<p style="font-size:0.86rem;color:var(--text-secondary);">${escapeHtml(data.error || "Telegram accounts unavailable")}</p>`;
+            return;
+        }
+        const accounts = data.accounts || [];
+        const extra = accounts.filter(a => a.id !== "primary");
+        if (!extra.length) {
+            box.innerHTML = `<p style="font-size:0.86rem;color:var(--text-secondary);">No backup accounts yet. Add a second phone number below — its own Telegram channel becomes a backup copy target. The primary account keeps working exactly as before.</p>`;
+            return;
+        }
+        box.innerHTML = extra.map(a => {
+            const statusLabel = { pending_login: "Pending login", paired: "Paired, no channel", ready: "Ready" }[a.status] || a.status;
+            const canBackup = a.status === "ready";
+            return `<div class="account-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;">${escapeHtml(a.name)}</div>
+                    <div style="font-size:0.82rem;color:var(--text-secondary);">${escapeHtml(a.phone)} · ${escapeHtml(statusLabel)} · ${a.backup_copies || 0} backup copies${a.channel_id ? " · channel " + a.channel_id : ""}</div>
+                    <div id="tg-acct-job-${escapeHtml(a.id)}" style="font-size:0.82rem;color:var(--text-secondary);"></div>
+                </div>
+                ${a.status === "pending_login" ? `<button class="btn btn-secondary" onclick="openAccountWizard('${escapeHtml(a.id)}','${escapeHtml(a.phone)}')">Pair</button>` : ""}
+                ${canBackup ? `<button class="btn btn-secondary" onclick="startAccountBackup('${escapeHtml(a.id)}')">Backup Now</button>` : ""}
+                <button class="btn btn-secondary" onclick="deleteTelegramAccount('${escapeHtml(a.id)}')">Remove</button>
+            </div>`;
+        }).join("");
+    } catch (e) {
+        box.innerHTML = `<p style="font-size:0.86rem;color:var(--text-secondary);">${escapeHtml(e.message || "Failed to load accounts")}</p>`;
+    }
+}
+
+async function addTelegramAccount() {
+    const name = document.getElementById("tg-acct-name").value.trim();
+    const phone = document.getElementById("tg-acct-phone").value.trim();
+    if (!name || !phone) { showToast("Name and phone are required", "error"); return; }
+    const res = await apiFetch("/api/telegram/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, phone }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || "Could not add account", "error"); return; }
+    document.getElementById("tg-acct-name").value = "";
+    document.getElementById("tg-acct-phone").value = "";
+    showToast("Account added — press Pair to log it in", "success");
+    loadTelegramAccounts();
+}
+
+async function deleteTelegramAccount(id) {
+    if (!confirm("Remove this backup account? Its stored session is deleted from this server. Backup copies already in its Telegram channel stay there until you delete the channel in Telegram.")) return;
+    const res = await apiFetch(`/api/telegram/accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); showToast(d.error || "Could not remove account", "error"); return; }
+    showToast("Account removed", "success");
+    loadTelegramAccounts();
+}
+
+function openAccountWizard(id, phone) {
+    TgWizard.accountId = id;
+    TgWizard.accountPhone = phone || "";
+    TgWizard.open();
+}
+
+async function startAccountBackup(id) {
+    const res = await apiFetch(`/api/telegram/accounts/${encodeURIComponent(id)}/backup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || "Could not start backup", "error"); return; }
+    showToast("Backup started — files not yet copied will stream to the backup channel", "success");
+    pollAccountBackup(id);
+}
+
+async function pollAccountBackup(id) {
+    const el = document.getElementById(`tg-acct-job-${id}`);
+    if (!el) return;
+    const timer = setInterval(async () => {
+        try {
+            const res = await apiFetch(`/api/telegram/accounts/${encodeURIComponent(id)}/backup/status`);
+            const data = await res.json().catch(() => ({}));
+            const job = data.job;
+            if (!job) { clearInterval(timer); el.textContent = ""; return; }
+            el.textContent = job.running ? `Backing up… ${job.done} copied, ${job.failed} failed` : `Backup done: ${job.done} copied, ${job.failed} failed${job.last_error ? " — last error: " + job.last_error : ""}`;
+            if (!job.running) { clearInterval(timer); loadTelegramAccounts(); }
+        } catch (_) { clearInterval(timer); }
+    }, 2000);
+}
+
+
+// ------------------------------------------------- overview telegram accounts ---
+function formatSyncedAgo(ts) {
+    if (!ts) return "never synced";
+    let d = new Date(ts);
+    if (isNaN(d.getTime()) && typeof ts === "string") d = new Date(ts.replace(" ", "T") + "Z");
+    if (isNaN(d.getTime())) return "never synced";
+    const mins = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+    if (mins < 1) return "Synced just now";
+    if (mins < 60) return `Synced ${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Synced ${hours}h ago`;
+    return `Synced ${Math.floor(hours / 24)}d ago`;
+}
+
+function accountInitials(name) {
+    const parts = (name || "?").trim().split(/\s+/);
+    return (parts[0][0] || "?").toUpperCase() + (parts.length > 1 ? (parts[1][0] || "").toUpperCase() : "");
+}
+
+async function renderOverviewAccounts() {
+    const box = document.getElementById("ov-accounts-list");
+    if (!box) return;
+    try {
+        const [accRes, mirRes] = await Promise.all([
+            apiFetch("/api/telegram/accounts"),
+            apiFetch("/api/telegram/mirror")
+        ]);
+        const data = await accRes.json().catch(() => ({}));
+        if (!accRes.ok) {
+            box.innerHTML = `<p class="dashboard-message">${escapeHtml(data.error || "Accounts unavailable")}</p>`;
+            return;
+        }
+        const toggle = document.getElementById("ov-mirror-toggle");
+        if (toggle && mirRes.ok) {
+            const mir = await mirRes.json().catch(() => ({}));
+            toggle.checked = !!mir.enabled;
+        }
+        const accounts = data.accounts || [];
+        const colors = ["#2f7bff", "#7b4dff", "#0e9f8a", "#e05d8a", "#e08a00"];
+        box.innerHTML = accounts.map((a, i) => {
+            const isPrimary = a.id === "primary";
+            const badge = isPrimary
+                ? `<span class="ov-badge ov-badge-primary">Primary</span>`
+                : `<span class="ov-badge ov-badge-mirror">Mirror</span>`;
+            const dot = (a.status === "ready" || a.status === "paired") ? "var(--success)" : "var(--text-muted)";
+            const sub = isPrimary ? "Primary account" : escapeHtml(a.phone || "Backup account");
+            const menu = isPrimary ? "" : `<div style="position:relative;">
+                <button class="btn-icon" onclick="event.stopPropagation(); toggleOvAccountMenu('${escapeHtml(a.id)}')" aria-label="Account actions">⋮</button>
+                <div id="ov-acct-menu-${escapeHtml(a.id)}" class="ov-acct-menu" style="display:none;">
+                    <button onclick="startAccountBackup('${escapeHtml(a.id)}'); renderOverviewAccounts();">Backup Now</button>
+                    <button onclick="deleteTelegramAccount('${escapeHtml(a.id)}'); renderOverviewAccounts();">Remove</button>
+                </div>
+            </div>`;
+            return `<div class="ov-account-row">
+                <span class="ov-avatar" style="background:${colors[i % colors.length]};">${escapeHtml(accountInitials(a.name))}</span>
+                <div class="ov-account-main">
+                    <div class="ov-account-name">${escapeHtml(a.name)} ${badge}</div>
+                    <div class="ov-account-sub">${sub}</div>
+                    <div class="ov-account-sync"><span class="status-dot" style="background:${dot};animation:none;"></span>${escapeHtml(formatSyncedAgo(a.last_synced_at))} · ${Number(a.files) || 0} files</div>
+                </div>
+                ${menu}
+            </div>`;
+        }).join("");
+    } catch (e) {
+        box.innerHTML = `<p class="dashboard-message">${escapeHtml(e.message || "Accounts unavailable")}</p>`;
+    }
+}
+
+function toggleOvAccountMenu(id) {
+    document.querySelectorAll(".ov-acct-menu").forEach(m => { if (m.id !== `ov-acct-menu-${id}`) m.style.display = "none"; });
+    const el = document.getElementById(`ov-acct-menu-${id}`);
+    if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+function openAddAccount() {
+    switchTab("storage");
+    setTimeout(() => {
+        const el = document.getElementById("tg-acct-name");
+        if (el) { el.scrollIntoView({ block: "center" }); el.focus(); }
+    }, 150);
+}
+
+async function toggleMirror(enabled) {
+    const res = await apiFetch("/api/telegram/mirror", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+    if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.error || "Could not save mirror setting", "error");
+        const t = document.getElementById("ov-mirror-toggle");
+        if (t) t.checked = !enabled;
+        return;
+    }
+    showToast(enabled ? "Mirror on: new uploads will be copied to backup accounts" : "Mirror off: use Backup Now for manual copies", "success");
+}
 
 function openTelegramWizard() { TgWizard.open(); }
 function closeTelegramWizard() { TgWizard.close(); }

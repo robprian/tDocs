@@ -245,7 +245,7 @@
                                     </span>
                                 </div>
                             </div>
-                            <div class="recent-cols"><span>Name</span><span>Modified</span><span>Size</span><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-label="Favorite"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span></span></div>
+                            <div class="recent-cols"><span>Name</span><span>Type</span><span>Modified</span><span>Size</span><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-label="Favorite"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span></span></div>
                             <div id="ov-recent-list" class="recent-list"></div>
                         </div>
 
@@ -270,7 +270,6 @@
                             <div class="rail-gauge">
                                 <svg id="ov-gauge" viewBox="0 0 120 120" class="gauge"></svg>
                                  <div class="gauge-center">
-                                     <span class="gauge-quota">Unlimited</span>
                                     <div id="ov-used" class="gauge-used">…</div>
                                     <div class="gauge-cap">used</div>
                                 </div>
@@ -279,6 +278,25 @@
                                 <div class="storage-legend-row"><span class="legend-dot"></span><span>Used Space</span><strong id="ov-legend-used">…</strong></div>
                                 <div class="storage-legend-row"><span class="legend-dot legend-dot-unlimited"></span><span>Capacity</span><strong>Unlimited</strong></div>
                                 <div class="storage-legend-row"><span>Storage</span><strong>Telegram Cloud</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="rail-card rail-accounts">
+                            <div class="rail-card-head">
+                                <span class="rail-card-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Telegram Accounts</span>
+                                <button class="btn btn-secondary btn-sm" onclick="openAddAccount()">+ Add</button>
+                            </div>
+                            <div id="ov-accounts-list" aria-live="polite"><p class="dashboard-message">Loading accounts…</p></div>
+                        </div>
+
+                        <div class="rail-card rail-mirror">
+                            <div class="ov-mirror-row">
+                                <div class="ov-mirror-text">
+                                    <strong>Multi-account Mirror</strong>
+                                    <span>New uploads are automatically copied to all ready backup accounts.</span>
+                                </div>
+                                <label class="ov-switch" aria-label="Multi-account Mirror"><input type="checkbox" id="ov-mirror-toggle" onchange="toggleMirror(this.checked)"><span class="ov-switch-track"></span></label>
+                                <button class="btn-icon" onclick="switchTab('storage')" aria-label="Backup account settings"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg></button>
                             </div>
                         </div>
 
@@ -567,6 +585,14 @@
                 <div id="verify-results" style="margin-bottom: 18px;"></div>
                 <div id="sync-backend-notice" style="display: none; margin-bottom: 18px; padding: 16px 18px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);"></div>
                 <div id="storage-health" class="stat-cards" style="margin-bottom: 18px;"></div>
+                <div class="section-header"><div class="section-title">Telegram Accounts (Backup)</div><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="loadTelegramAccounts()">Refresh</button></div>
+                <p style="font-size: 0.86rem; color: var(--text-secondary); margin-bottom: 12px;">Additional phone numbers, each with its own Telegram channel. Backup Now streams library files that are not yet copied to that account's channel; already-copied files are skipped. Backup channels never merge into the main catalog.</p>
+                <div id="tg-accounts-list" style="margin-bottom: 12px;"></div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
+                    <input id="tg-acct-name" type="text" placeholder="Account name, e.g. Backup HP 2" style="flex: 1; min-width: 160px;" class="form-input">
+                    <input id="tg-acct-phone" type="text" placeholder="Phone, e.g. +628123456789" style="flex: 1; min-width: 160px;" class="form-input">
+                    <button class="btn btn-primary" onclick="addTelegramAccount()">Add Account</button>
+                </div>
                 <div class="section-header"><div class="section-title">Sync History</div><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="loadStorageCenter()">Refresh</button></div>
                 <div class="table-container">
                     <table class="data-table">

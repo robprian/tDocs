@@ -43,8 +43,8 @@ func (m *ClientManager) channelBoundOrRestore() error {
 	if _, _, err := m.StorageChannel(); err == nil {
 		return nil
 	}
-	storedID, idErr := m.db.GetSetting("storage_channel_id")
-	storedHash, hashErr := m.db.GetSetting("storage_channel_hash")
+	storedID, idErr := m.db.GetSetting(m.channelIDKey)
+	storedHash, hashErr := m.db.GetSetting(m.channelHashKey)
 	if idErr != nil || hashErr != nil || storedID == "" || storedHash == "" {
 		return fmt.Errorf("storage channel belum terikat — jalankan `tdocs login` untuk menautkan channel")
 	}

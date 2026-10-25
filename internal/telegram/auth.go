@@ -92,16 +92,16 @@ func (m *ClientManager) IsAuthorized() bool {
 func (m *ClientManager) markAuthorized(ok bool) {
 	m.authorized.Store(ok)
 	if ok {
-		_ = m.db.SetSetting("telegram_authorized", "1")
+		_ = m.db.SetSetting(m.authorizedKey, "1")
 	} else {
-		_ = m.db.DeleteSetting("telegram_authorized")
+		_ = m.db.DeleteSetting(m.authorizedKey)
 	}
 }
 
 // EnsureStorageChannel verifies, discovers, or creates the private Storage Channel vault.
 func (m *ClientManager) EnsureStorageChannel(ctx context.Context) error {
-	storedID, err := m.db.GetSetting("storage_channel_id")
-	storedHash, errHash := m.db.GetSetting("storage_channel_hash")
+	storedID, err := m.db.GetSetting(m.channelIDKey)
+	storedHash, errHash := m.db.GetSetting(m.channelHashKey)
 
 	if err == nil && errHash == nil && storedID != "" && storedHash != "" {
 		cID, _ := strconv.ParseInt(storedID, 10, 64)
@@ -115,8 +115,8 @@ func (m *ClientManager) EnsureStorageChannel(ctx context.Context) error {
 		hash, err := m.ResolveChannelByID(ctx, m.configuredChannelID)
 		if err == nil {
 			m.SetStorageChannel(m.configuredChannelID, hash)
-			_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(m.configuredChannelID, 10))
-			_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(hash, 10))
+			_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(m.configuredChannelID, 10))
+			_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(hash, 10))
 			fmt.Printf("✓ Bound to configured Storage Channel (ID: %d)\n", m.configuredChannelID)
 			return nil
 		}
@@ -126,8 +126,8 @@ func (m *ClientManager) EnsureStorageChannel(ctx context.Context) error {
 	if err == nil && len(candidates) == 1 {
 		cand := candidates[0]
 		m.SetStorageChannel(cand.ID, cand.AccessHash)
-		_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(cand.ID, 10))
-		_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(cand.AccessHash, 10))
+		_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(cand.ID, 10))
+		_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(cand.AccessHash, 10))
 		fmt.Printf("✓ Auto-discovered existing Storage Channel (ID: %d)\n", cand.ID)
 		return nil
 	} else if err == nil && len(candidates) > 1 {
@@ -139,8 +139,8 @@ func (m *ClientManager) EnsureStorageChannel(ctx context.Context) error {
 			}
 		}
 		m.SetStorageChannel(best.ID, best.AccessHash)
-		_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(best.ID, 10))
-		_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(best.AccessHash, 10))
+		_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(best.ID, 10))
+		_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(best.AccessHash, 10))
 		fmt.Printf("✓ Auto-discovered Storage Channel (ID: %d, %d snapshots)\n", best.ID, best.SnapshotCount)
 		return nil
 	}

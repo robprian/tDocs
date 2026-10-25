@@ -20,6 +20,15 @@ type ClientManager struct {
 	secretKey string
 	storage   *EncryptedSessionStorage
 
+	// Per-account settings keys. The primary account uses the legacy
+	// global keys; additional accounts get suffixed keys so their
+	// authorization flag and storage channel never overwrite the
+	// primary account's (EnsureStorageChannel, markAuthorized and
+	// CreateStorageChannel all write through these fields).
+	channelIDKey   string
+	channelHashKey string
+	authorizedKey  string
+
 	mu                  sync.Mutex
 	channelID           int64
 	accessHash          int64
@@ -53,19 +62,46 @@ type runTask struct {
 
 // NewClientManager configures a new MTProto client instance with Safe Mode client headers.
 func NewClientManager(database *db.DB, appID int, appHash, secretKey string) *ClientManager {
-	storage := NewEncryptedSessionStorage(database, secretKey)
+	return NewClientManagerForAccount(database, appID, appHash, secretKey,
+		"telegram_session", "storage_channel_id", "storage_channel_hash", "telegram_authorized")
+}
+
+// NewClientManagerForAccount is NewClientManager for one named Telegram
+// account. sessionKey, channelIDKey, channelHashKey and authorizedKey must
+// be unique per account; pass the legacy global keys for the primary
+// account (see NewClientManager).
+func NewClientManagerForAccount(database *db.DB, appID int, appHash, secretKey, sessionKey, channelIDKey, channelHashKey, authorizedKey string) *ClientManager {
+	storage := NewEncryptedSessionStorageForKey(database, secretKey, sessionKey)
 	client := newTelegramClient(appID, appHash, storage)
 
 	return &ClientManager{
-		client:    client,
-		api:       tg.NewClient(client),
-		db:        database,
-		appID:     appID,
-		appHash:   appHash,
-		secretKey: secretKey,
-		storage:   storage,
-		taskCh:    make(chan runTask),
+		client:         client,
+		api:            tg.NewClient(client),
+		db:             database,
+		appID:          appID,
+		appHash:        appHash,
+		secretKey:      secretKey,
+		storage:        storage,
+		channelIDKey:   channelIDKey,
+		channelHashKey: channelHashKey,
+		authorizedKey:  authorizedKey,
+		taskCh:         make(chan runTask),
 	}
+}
+
+// ChannelKeys returns the settings keys this manager writes its storage
+// channel and authorization flag to.
+func (m *ClientManager) ChannelKeys() (channelIDKey, channelHashKey, authorizedKey string) {
+	return m.channelIDKey, m.channelHashKey, m.authorizedKey
+}
+
+// IsRunning reports whether this manager's long-lived Run loop is active.
+// Callers that start a manager and then immediately dispatch work (wizard,
+// backup) wait on this instead of assuming the goroutine has scheduled.
+func (m *ClientManager) IsRunning() bool {
+	m.runMu.Lock()
+	defer m.runMu.Unlock()
+	return m.running
 }
 
 func newTelegramClient(appID int, appHash string, storage *EncryptedSessionStorage) *telegram.Client {

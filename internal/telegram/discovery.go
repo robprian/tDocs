@@ -140,8 +140,8 @@ func (m *ClientManager) CreateStorageChannel(ctx context.Context) (int64, int64,
 	}
 
 	m.SetStorageChannel(channelID, accessHash)
-	_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(channelID, 10))
-	_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(accessHash, 10))
+	_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(channelID, 10))
+	_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(accessHash, 10))
 
 	fmt.Printf("✓ Created private Storage Channel 'tDocs Vault' (ID: %d)\n", channelID)
 	return channelID, accessHash, nil
@@ -149,8 +149,8 @@ func (m *ClientManager) CreateStorageChannel(ctx context.Context) (int64, int64,
 
 // OnboardStorageChannelInteractive guides user through discovering, selecting, and restoring storage channel.
 func (m *ClientManager) OnboardStorageChannelInteractive(ctx context.Context, reader *bufio.Reader, destDBPath string) error {
-	storedID, err := m.db.GetSetting("storage_channel_id")
-	storedHash, errHash := m.db.GetSetting("storage_channel_hash")
+	storedID, err := m.db.GetSetting(m.channelIDKey)
+	storedHash, errHash := m.db.GetSetting(m.channelHashKey)
 
 	if err == nil && errHash == nil && storedID != "" && storedHash != "" {
 		cID, _ := strconv.ParseInt(storedID, 10, 64)
@@ -164,8 +164,8 @@ func (m *ClientManager) OnboardStorageChannelInteractive(ctx context.Context, re
 		hash, err := m.ResolveChannelByID(ctx, m.configuredChannelID)
 		if err == nil {
 			m.SetStorageChannel(m.configuredChannelID, hash)
-			_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(m.configuredChannelID, 10))
-			_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(hash, 10))
+			_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(m.configuredChannelID, 10))
+			_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(hash, 10))
 			fmt.Printf("✓ Bound to configured Storage Channel (ID: %d)\n", m.configuredChannelID)
 			return nil
 		}
@@ -233,8 +233,8 @@ func (m *ClientManager) OnboardStorageChannelInteractive(ctx context.Context, re
 	}
 
 	m.SetStorageChannel(selected.ID, selected.AccessHash)
-	_ = m.db.SetSetting("storage_channel_id", strconv.FormatInt(selected.ID, 10))
-	_ = m.db.SetSetting("storage_channel_hash", strconv.FormatInt(selected.AccessHash, 10))
+	_ = m.db.SetSetting(m.channelIDKey, strconv.FormatInt(selected.ID, 10))
+	_ = m.db.SetSetting(m.channelHashKey, strconv.FormatInt(selected.AccessHash, 10))
 	fmt.Printf("✓ Storage Channel linked (ID: %d)\n", selected.ID)
 
 	if selected.SnapshotCount > 0 && selected.LatestSnapshot != nil {
@@ -254,8 +254,8 @@ func (m *ClientManager) OnboardStorageChannelInteractive(ctx context.Context, re
 				return fmt.Errorf("reopen restored database: %w", err)
 			}
 			m.SetDB(reopened)
-			_ = reopened.SetSetting("storage_channel_id", strconv.FormatInt(selected.ID, 10))
-			_ = reopened.SetSetting("storage_channel_hash", strconv.FormatInt(selected.AccessHash, 10))
+			_ = reopened.SetSetting(m.channelIDKey, strconv.FormatInt(selected.ID, 10))
+			_ = reopened.SetSetting(m.channelHashKey, strconv.FormatInt(selected.AccessHash, 10))
 			fmt.Println("✓ Database successfully restored from Telegram Storage Channel!")
 		} else {
 			fmt.Println("Skipping restore. tDocs will run with current local database.")

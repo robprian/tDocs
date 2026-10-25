@@ -123,6 +123,18 @@ CREATE TABLE IF NOT EXISTS sync_runs (
     updated INTEGER NOT NULL DEFAULT 0,
     error TEXT NOT NULL DEFAULT ''
 );
+
+-- Multi-Telegram backup copies: one row per (file, backup account).
+-- The backup channel's message ID lives here only — never in files or
+-- file_versions, so backup channels can never collide with the primary
+-- catalog's message-ID namespace.
+CREATE TABLE IF NOT EXISTS backup_copies (
+    file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL,
+    backup_message_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (file_id, account_id)
+);
 `
 
 // SchemaVersion is the schema level this binary understands. It is stored in
