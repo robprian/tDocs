@@ -415,7 +415,11 @@ async function switchTab(tab) {
     };
     // Media sub-sections (Music / Videos / Images) render into the shared
     // media container so the library code stays single-source.
-    const containerKey = MEDIA_TABS[tab] ? "media" : tab;
+    // Sidebar aliases reuse existing containers: Recent shows the
+    // Overview recent panel, Backups is the Snapshots view, Documents
+    // and Categories are filtered/root views of Drive.
+    const aliasContainer = { recent: "overview", backups: "snapshots", documents: "drive", categories: "drive" };
+    const containerKey = MEDIA_TABS[tab] ? "media" : (aliasContainer[tab] || tab);
     for (const [name, id] of Object.entries(containers)) {
         const el = document.getElementById(id);
         if (el) el.style.display = (name === containerKey) ? "block" : "none";
@@ -424,6 +428,25 @@ async function switchTab(tab) {
 
     if (tab === "overview") {
         loadOverview();
+    } else if (tab === "recent") {
+        await loadOverview();
+        document.querySelector(".recent-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (tab === "backups") {
+        loadSnapshotsContent();
+    } else if (tab === "documents") {
+        currentFolderId = null;
+        currentFolderPath = [];
+        activeSearchQuery = "";
+        const search = document.getElementById("search-box");
+        if (search) search.value = "";
+        await loadDriveContent();
+        document.getElementById("filter-mime").value = "document";
+        document.getElementById("filter-size").value = "";
+        await applyDriveFilters();
+    } else if (tab === "categories") {
+        currentFolderId = null;
+        currentFolderPath = [];
+        await loadDriveContent();
     } else if (tab === "drive") {
         await loadDriveContent();
     } else if (MEDIA_TABS[tab]) {
@@ -2233,6 +2256,8 @@ async function loadOverview() {
 
         renderOverviewMetrics(s);
         renderOverviewAccounts();
+        renderOverviewSync();
+        renderOverviewUsage(s);
 
         const stored = typeof s.bytes === "number" ? formatSize(s.bytes) : "Unavailable";
         ["ov-used", "ov-legend-used"].forEach(id => {
@@ -4811,6 +4836,117 @@ async function pollAccountBackup(id) {
     }, 2000);
 }
 
+
+// Collapse/expand one sidebar section (the nav-links up to the next label).
+function toggleSidebarSection(btn) {
+    const collapsed = btn.getAttribute("aria-expanded") !== "false";
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    let el = btn.nextElementSibling;
+    while (el && !el.classList.contains("sidebar-section-label")) {
+        if (el.classList.contains("nav-link")) el.style.display = collapsed ? "none" : "";
+        el = el.nextElementSibling;
+    }
+}
+
+// Relative time without the "Synced" prefix, for the Synchronization card.
+function formatAgo(ts) {
+    if (!ts) return "Never";
+    let d = new Date(ts);
+    if (isNaN(d.getTime()) && typeof ts === "string") d = new Date(ts.replace(" ", "T") + "Z");
+    if (isNaN(d.getTime())) return "Never";
+    const mins = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    return `${Math.floor(hours / 24)} day${Math.floor(hours / 24) === 1 ? "" : "s"} ago`;
+}
+
+// Synchronization rail card: last sync run, live status, indexed files and
+// measured speed from real sync runs — never invented numbers. Pending
+// files have no backend source, so the row stays "—" instead of a fake 0.
+async function renderOverviewSync() {
+    const badge = document.getElementById("ov-sync-badge");
+    const lastEl = document.getElementById("ov-sync-last");
+    const statusEl = document.getElementById("ov-sync-status");
+    const filesEl = document.getElementById("ov-sync-files");
+    const speedEl = document.getElementById("ov-sync-speed");
+    if (!lastEl) return;
+    if (filesEl) filesEl.textContent = overviewStats && typeof overviewStats.files === "number" ? `${overviewStats.files} files` : "…";
+    try {
+        const res = await apiFetch("/api/sync/runs?limit=20");
+        const runs = res.ok ? (await res.json() || []) : [];
+        if (!runs.length) {
+            lastEl.textContent = "Never";
+            statusEl.textContent = "Idle";
+            if (badge) { badge.textContent = "Idle"; badge.className = "ov-sync-badge idle"; }
+            return;
+        }
+        const latest = runs[0];
+        lastEl.textContent = formatAgo(latest.started_at);
+        const live = overviewStats && overviewStats.telegram_state === "connected";
+        if (!latest.finished_at) {
+            statusEl.textContent = "Running";
+            statusEl.style.color = "var(--success)";
+            if (badge) { badge.textContent = "Live"; badge.className = "ov-sync-badge live"; }
+        } else if (latest.error) {
+            statusEl.textContent = "Error";
+            statusEl.style.color = "var(--danger)";
+            if (badge) { badge.textContent = "Idle"; badge.className = "ov-sync-badge idle"; }
+        } else {
+            statusEl.textContent = "Idle";
+            statusEl.style.color = "";
+            if (badge) { badge.textContent = live ? "Live" : "Idle"; badge.className = live ? "ov-sync-badge live" : "ov-sync-badge idle"; }
+        }
+        if (speedEl) {
+            const done = runs.find(r => r.finished_at && !r.error);
+            if (done) {
+                const durMin = (new Date(done.finished_at.replace(" ", "T") + "Z") - new Date(done.started_at.replace(" ", "T") + "Z")) / 60000;
+                speedEl.textContent = durMin >= 1 ? `${Math.round(((done.inserted || 0) + (done.updated || 0)) / durMin)} files/min` : "—";
+            }
+        }
+    } catch (_) {
+        lastEl.textContent = "—";
+        statusEl.textContent = "—";
+    }
+}
+
+// Storage Usage rail card: donut + legend from the real /api/stats
+// mime breakdown (Documents / Images / Videos / Music / Others).
+function renderOverviewUsage(s) {
+    const donut = document.getElementById("ov-usage-donut");
+    const totalEl = document.getElementById("ov-usage-total");
+    const legend = document.getElementById("ov-usage-legend");
+    if (!donut || !legend) return;
+    const cats = s.breakdown || [];
+    const total = cats.reduce((sum, c) => sum + Math.max(0, Number(c.bytes) || 0), 0);
+    if (totalEl) totalEl.textContent = typeof s.bytes === "number" ? formatSize(s.bytes) : formatSize(total);
+    const defs = [
+        ["document", "Documents", "#2f7bff"],
+        ["image", "Images", "#1fae7a"],
+        ["video", "Videos", "#8b5cf6"],
+        ["audio", "Music", "#ec4899"],
+        ["other", "Others", "#9badc6"],
+    ];
+    if (!total) {
+        donut.style.background = "var(--track)";
+        legend.innerHTML = '<p class="dashboard-message">Nothing stored yet.</p>';
+        return;
+    }
+    let acc = 0;
+    const stops = defs.map(([key, , color]) => {
+        const bytes = (cats.find(c => c.category === key) || {}).bytes || 0;
+        const share = bytes / total;
+        const from = acc * 100, to = (acc + share) * 100;
+        acc += share;
+        return share > 0 ? `${color} ${from.toFixed(1)}% ${to.toFixed(1)}%` : "";
+    }).filter(Boolean).join(", ");
+    donut.style.background = `conic-gradient(${stops})`;
+    legend.innerHTML = defs.map(([key, label, color]) => {
+        const bytes = (cats.find(c => c.category === key) || {}).bytes || 0;
+        return `<div class="ov-usage-row"><span class="ov-usage-dot" style="background:${color}"></span><span>${label}</span><strong>${formatSize(bytes)}</strong></div>`;
+    }).join("");
+}
 
 // ------------------------------------------------- overview telegram accounts ---
 function formatSyncedAgo(ts) {

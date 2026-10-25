@@ -2112,3 +2112,37 @@ body[data-active-tab="overview"] #telegram-setup-banner { display: none !importa
 .ov-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.15s; }
 .ov-switch input:checked + .ov-switch-track { background: #2f7bff; }
 .ov-switch input:checked + .ov-switch-track::after { transform: translateX(20px); }
+
+/* Sidebar sections: labels are buttons with a collapse chevron (new design). */
+button.sidebar-section-label { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: 0; cursor: pointer; font-family: var(--font-family); }
+button.sidebar-section-label .sidebar-chev { width: 14px; height: 14px; flex: none; transition: transform 0.15s; color: var(--sb-muted); }
+button.sidebar-section-label[aria-expanded="false"] .sidebar-chev { transform: rotate(-90deg); }
+
+/* Overview right rail: new-design cards (Synchronization + Storage Usage). */
+.rail-sync .rail-card-title { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; }
+.rail-sync .rail-card-title > .icon { width: 34px; height: 34px; padding: 6px; color: #fff; background: #2f7bff; border-radius: 50%; }
+.rail-sync-actions { display: flex; align-items: center; gap: 4px; }
+.ov-sync-badge { font-size: 0.66rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.ov-sync-badge.live { color: #0e7a3d; background: #e3f5e9; }
+.ov-sync-badge.idle { color: var(--text-secondary); background: var(--track); }
+.rail-sync .rail-kv-row { font-size: 0.85rem; padding: 3px 0; }
+.rail-sync .rail-kv-row strong { font-weight: 650; }
+
+/* Mirror card, new-design layout: icon + title + toggle on top, text below, gear bottom-right. */
+.rail-mirror { position: relative; }
+.ov-mirror-head { display: flex; align-items: center; gap: 10px; }
+.ov-mirror-icon { width: 34px; height: 34px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #2f6fed; background: #e8f0fe; }
+.ov-mirror-head strong { flex: 1; font-size: 0.9rem; }
+.ov-mirror-text { margin: 8px 0 0; padding-right: 36px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+.ov-mirror-gear { position: absolute; right: 12px; bottom: 12px; }
+
+/* Storage Usage card: donut + legend. */
+.ov-usage-body { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+.ov-usage-donut { position: relative; width: 118px; height: 118px; flex: none; border-radius: 50%; background: var(--track); }
+.ov-usage-center { position: absolute; inset: 14px; border-radius: 50%; background: var(--bg-panel); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ov-usage-center strong { font-size: 0.95rem; }
+.ov-usage-center span { font-size: 0.75rem; color: var(--text-secondary); }
+.ov-usage-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ov-usage-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); }
+.ov-usage-row strong { margin-left: auto; color: var(--text-primary); font-weight: 650; white-space: nowrap; }
+.ov-usage-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; }

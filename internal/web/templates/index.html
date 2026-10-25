@@ -26,7 +26,7 @@
 
 
             <nav class="sidebar-nav">
-                <div class="sidebar-section-label">Menu</div>
+                <button type="button" class="sidebar-section-label" onclick="toggleSidebarSection(this)" aria-expanded="true"><span>Menu</span><svg class="icon icon-sm sidebar-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
                 <button type="button" class="nav-link nav-blue active" id="nav-overview" onclick="switchTab('overview')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
                     <span>Overview</span>
@@ -35,20 +35,24 @@
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
                     <span>All Files</span>
                 </button>
+                <button type="button" class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <span>Shared Links</span>
+                </button>
                 <button type="button" class="nav-link nav-orange" id="nav-favorites" onclick="switchTab('favorites')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     <span>Favorites</span>
                 </button>
-                <button type="button" class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                    <span>Shared Links</span>
+                <button type="button" class="nav-link nav-blue" id="nav-recent" onclick="switchTab('recent')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    <span>Recent</span>
                 </button>
                 <button type="button" class="nav-link nav-red" id="nav-trash" onclick="switchTab('trash')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     <span>Trash</span>
                 </button>
 
-                <div class="sidebar-section-label">Storage</div>
+                <button type="button" class="sidebar-section-label" onclick="toggleSidebarSection(this)" aria-expanded="true"><span>Storage</span><svg class="icon icon-sm sidebar-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
                 <button type="button" class="nav-link nav-green" id="nav-storage" onclick="switchTab('storage')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
                     <span>Sync Center</span>
@@ -57,22 +61,34 @@
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
                     <span>Snapshots</span>
                 </button>
-
-                <div class="sidebar-section-label">Media</div>
-                <button type="button" class="nav-link nav-purple" id="nav-music" onclick="switchTab('music')">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    <span>Music</span>
+                <button type="button" class="nav-link nav-green" id="nav-backups" onclick="switchTab('backups')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                    <span>Backups</span>
                 </button>
-                <button type="button" class="nav-link nav-purple" id="nav-videos" onclick="switchTab('videos')">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
-                    <span>Videos</span>
+
+                <button type="button" class="sidebar-section-label" onclick="toggleSidebarSection(this)" aria-expanded="true"><span>Media</span><svg class="icon icon-sm sidebar-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button type="button" class="nav-link nav-purple" id="nav-documents" onclick="switchTab('documents')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8"/></svg>
+                    <span>Documents</span>
                 </button>
                 <button type="button" class="nav-link nav-purple" id="nav-images" onclick="switchTab('images')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     <span>Images</span>
                 </button>
+                <button type="button" class="nav-link nav-purple" id="nav-videos" onclick="switchTab('videos')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+                    <span>Videos</span>
+                </button>
+                <button type="button" class="nav-link nav-purple" id="nav-music" onclick="switchTab('music')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <span>Music</span>
+                </button>
 
-                <div class="sidebar-section-label">System</div>
+                <button type="button" class="sidebar-section-label" onclick="toggleSidebarSection(this)" aria-expanded="true"><span>Tools</span><svg class="icon icon-sm sidebar-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button type="button" class="nav-link nav-gray" id="nav-categories" onclick="switchTab('categories')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                    <span>Categories</span>
+                </button>
                 <button type="button" class="nav-link nav-gray" id="nav-settings" onclick="switchTab('settings')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg>
                     <span>Settings</span>
@@ -265,22 +281,6 @@
                     </div>
 
                     <aside class="right-rail">
-                        <div class="rail-card rail-storage">
-                            <div class="rail-card-head"><h2 class="rail-card-title">Storage</h2><button class="details-link" onclick="switchTab('storage')">Manage</button></div>
-                            <div class="rail-gauge">
-                                <svg id="ov-gauge" viewBox="0 0 120 120" class="gauge"></svg>
-                                 <div class="gauge-center">
-                                    <div id="ov-used" class="gauge-used">…</div>
-                                    <div class="gauge-cap">used</div>
-                                </div>
-                            </div>
-                            <div class="storage-legend">
-                                <div class="storage-legend-row"><span class="legend-dot"></span><span>Used Space</span><strong id="ov-legend-used">…</strong></div>
-                                <div class="storage-legend-row"><span class="legend-dot legend-dot-unlimited"></span><span>Capacity</span><strong>Unlimited</strong></div>
-                                <div class="storage-legend-row"><span>Storage</span><strong>Telegram Cloud</strong></div>
-                            </div>
-                        </div>
-
                         <div class="rail-card rail-accounts">
                             <div class="rail-card-head">
                                 <span class="rail-card-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Telegram Accounts</span>
@@ -290,51 +290,35 @@
                         </div>
 
                         <div class="rail-card rail-mirror">
-                            <div class="ov-mirror-row">
-                                <div class="ov-mirror-text">
-                                    <strong>Multi-account Mirror</strong>
-                                    <span>New uploads are automatically copied to all ready backup accounts.</span>
-                                </div>
+                            <div class="ov-mirror-head">
+                                <span class="ov-mirror-icon" aria-hidden="true"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+                                <strong>Multi-account Mirror</strong>
                                 <label class="ov-switch" aria-label="Multi-account Mirror"><input type="checkbox" id="ov-mirror-toggle" onchange="toggleMirror(this.checked)"><span class="ov-switch-track"></span></label>
-                                <button class="btn-icon" onclick="switchTab('storage')" aria-label="Backup account settings"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg></button>
                             </div>
+                            <p class="ov-mirror-text">New uploads are automatically copied to all ready backup accounts.</p>
+                            <button class="btn-icon ov-mirror-gear" onclick="switchTab('storage')" aria-label="Backup account settings"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg></button>
                         </div>
 
-                        <div class="rail-card rail-telegram">
+                        <div class="rail-card rail-sync">
                             <div class="rail-card-head">
-                                <span class="rail-card-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Telegram Cloud</span>
-                                <span id="tg-state-pill" class="tg-state-pill" role="status" aria-live="polite">Checking…</span>
-                            </div>
-                            <div class="rail-row">
-                                <span class="status-dot" id="status-dot"></span>
-                                <span id="status-label" class="rail-row-main" aria-live="polite">Checking…</span>
+                                <span class="rail-card-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Synchronization</span>
+                                <span class="rail-sync-actions"><span id="ov-sync-badge" class="ov-sync-badge">…</span><button class="btn-icon" onclick="switchTab('storage')" aria-label="Sync Center"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></span>
                             </div>
                             <div class="rail-kv">
-                                <div class="rail-kv-row"><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>Storage Channel</span><strong id="status-channel">…</strong></div>
-                                <div class="rail-kv-row"><span><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 4v16"/></svg>Files indexed</span><strong id="status-files">0</strong></div>
-                            </div>
-                            <div class="telegram-actions">
-                                <button class="btn btn-primary btn-sm" id="rail-telegram-action" onclick="openTelegramWizard()">Connect Telegram</button>
-                                <button class="btn-icon" onclick="switchTab('storage')" aria-label="Telegram storage settings"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg></button>
+                                <div class="rail-kv-row"><span>Last Sync</span><strong id="ov-sync-last">…</strong></div>
+                                <div class="rail-kv-row"><span>Sync Status</span><strong id="ov-sync-status">…</strong></div>
+                                <div class="rail-kv-row"><span>Files Indexed</span><strong id="ov-sync-files">…</strong></div>
+                                <div class="rail-kv-row"><span>Pending Files</span><strong id="ov-sync-pending">—</strong></div>
+                                <div class="rail-kv-row"><span>Sync Speed</span><strong id="ov-sync-speed">—</strong></div>
                             </div>
                         </div>
 
-                        <section class="rail-card rail-upload" aria-labelledby="rail-upload-title">
-                            <h2 class="rail-card-title" id="rail-upload-title">Upload Files</h2>
-                            <div id="ov-dropzone" class="dropzone rail-dropzone">
-                                <svg class="icon icon-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 17v-7m-3 3 3-3 3 3"/></svg>
-                                <strong>Drag &amp; drop files here</strong><span>or click to browse</span><small>All file types, up to 2 GB per file</small>
+                        <div class="rail-card rail-usage">
+                            <div class="rail-card-head"><h2 class="rail-card-title">Storage Usage</h2><button class="details-link" onclick="switchTab('storage')">Manage</button></div>
+                            <div class="ov-usage-body">
+                                <div class="ov-usage-donut" id="ov-usage-donut" role="img" aria-label="Storage usage by category"><div class="ov-usage-center"><strong id="ov-usage-total">…</strong><span>used</span></div></div>
+                                <div class="ov-usage-legend" id="ov-usage-legend" aria-live="polite"><p class="dashboard-message">Loading usage…</p></div>
                             </div>
-                        </section>
-
-                        <section class="rail-card rail-activity" aria-labelledby="activity-title">
-                            <div class="rail-card-head"><h2 class="rail-card-title" id="activity-title">Recent Activity</h2><button class="details-link" onclick="switchTab('settings')">View All</button></div>
-                            <div id="ov-activity" aria-live="polite"><p class="dashboard-message">Loading activity…</p></div>
-                        </section>
-
-                        <div class="rail-card rail-categories">
-                            <div class="rail-card-head"><span class="rail-card-title">File Categories</span><button class="rail-more" onclick="navigateTo(null)" aria-label="Browse all categories">⋯</button></div>
-                            <div id="ov-breakdown" class="breakdown-list cat-list"></div>
                         </div>
 
                     </aside>
