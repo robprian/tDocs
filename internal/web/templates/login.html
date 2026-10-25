@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex, nofollow">
+    <title>tDocs | Sign In</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
+    <link rel="stylesheet" href="/static/style.css?v=27">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <div class="auth-frame">
+            <aside class="login-story" aria-labelledby="story-title">
+                <div class="login-story-image" aria-hidden="true"></div>
+                <div class="login-story-accessible">
+                    <h2 id="story-title">Your Files Always With You</h2>
+                    <p>Private, fast, and secure cloud storage powered by your own Telegram account.</p>
+                    <ul>
+                        <li>Store: Keep your files safe</li>
+                        <li>Access: From anywhere</li>
+                        <li>Secure: Only you can access</li>
+                        <li>Fast: Powered by Telegram</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <section class="login-card" aria-labelledby="login-title">
+                <header class="login-header">
+                    <img class="login-logo" src="/static/logo-light.png" alt="tDocs" width="384" height="384">
+                    <h1 class="login-title" id="login-title">Welcome Back</h1>
+                    <p class="login-subtitle">Sign in to access your cloud storage</p>
+                </header>
+
+                {{if .Error}}
+                <div class="login-error" role="alert">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>{{.Error}}</span>
+                </div>
+                <p class="login-recovery">
+                    Locked out? On the server run <code>tdocs passwd --clear</code> to fall back to
+                    <code>TDOCS_ADMIN_PASSWORD</code>, or <code>tdocs passwd &lt;new-password&gt;</code> to set a new one.
+                </p>
+                {{end}}
+
+                <div class="login-hint" id="caps-hint" hidden>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 12 9-9 9 9"/><path d="M12 3v18"/><path d="M5 21h14"/></svg>
+                    <span>Caps Lock is on</span>
+                </div>
+
+                <form class="login-form" method="POST" action="/login" id="login-form" autocomplete="on">
+                    <div class="password-wrap">
+                        <svg class="password-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                        <input type="password" name="password" id="password" class="form-input"
+                               placeholder="Enter your admin password" required autofocus
+                               autocomplete="current-password" spellcheck="false"
+                               aria-label="Admin password" aria-describedby="password-help">
+                        <button type="button" class="password-toggle" id="pwd-toggle" aria-label="Show password" aria-pressed="false">
+                            <svg class="icon icon-sm" id="eye-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    <p class="login-sr-only" id="password-help">Enter the admin password configured for this server.</p>
+
+                    <button type="submit" class="btn btn-primary login-submit" id="btn-submit">
+                        <span class="spinner" id="btn-spinner" hidden aria-hidden="true"></span>
+                        <svg class="login-signin-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg>
+                        <span id="btn-text">Sign In</span>
+                    </button>
+                </form>
+
+                <div class="login-divider"><span>or</span></div>
+
+                <div class="login-assurance">
+                    <div class="login-assurance-item">
+                        <span class="login-assurance-icon data-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+                        </span>
+                        <strong>Your Data</strong>
+                        <span>Stays on your server</span>
+                    </div>
+                    <div class="login-assurance-item">
+                        <span class="login-assurance-icon access-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>
+                        </span>
+                        <strong>Secure Access</strong>
+                        <span>Only authorized</span>
+                    </div>
+                    <div class="login-assurance-item">
+                        <span class="login-assurance-icon fast-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-13h-7z"/></svg>
+                        </span>
+                        <strong>Fast &amp; Reliable</strong>
+                        <span>Powered by Telegram</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <noscript>
+            <p class="login-noscript">Sign in works without JavaScript. Password visibility and Caps Lock hints require JavaScript.</p>
+        </noscript>
+    </main>
+
+    <script>
+        (function () {
+            "use strict";
+            var input = document.getElementById("password");
+            var eyeIcon = document.getElementById("eye-icon");
+            var pwdToggle = document.getElementById("pwd-toggle");
+            var capsHint = document.getElementById("caps-hint");
+
+            if (pwdToggle) {
+                pwdToggle.addEventListener("click", function () {
+                    var shown = input.type === "text";
+                    input.type = shown ? "password" : "text";
+                    pwdToggle.setAttribute("aria-label", shown ? "Show password" : "Hide password");
+                    pwdToggle.setAttribute("aria-pressed", shown ? "false" : "true");
+                    if (eyeIcon) {
+                        eyeIcon.innerHTML = shown
+                            ? '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'
+                            : '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/>';
+                    }
+                    input.focus();
+                });
+            }
+
+            // Caps Lock detection: only trust getModifierState when the browser
+            // provides it, and never leave the hint pinned on. The hint is a
+            // plain `hidden` attribute … the CSS `[hidden]` rule guarantees it
+            // actually disappears (see style.css).
+            function capsOn(e) {
+                return !!(e && typeof e.getModifierState === "function" && e.getModifierState("CapsLock"));
+            }
+            function updateCaps(e) {
+                if (!capsHint) return;
+                capsHint.hidden = !capsOn(e);
+            }
+            if (input) {
+                input.addEventListener("keydown", updateCaps);
+                input.addEventListener("keyup", updateCaps);
+                input.addEventListener("focus", updateCaps);
+                input.addEventListener("blur", function () { if (capsHint) capsHint.hidden = true; });
+            }
+            // Catch a Caps Lock toggle that happens while the field is not focused.
+            window.addEventListener("keyup", function (e) {
+                if (e.key === "CapsLock" && document.activeElement !== input) updateCaps(e);
+            });
+
+                var form = document.getElementById("login-form");
+                if (form) form.addEventListener("submit", function () {
+                    var btn = document.getElementById("btn-submit");
+                    var text = document.getElementById("btn-text");
+                    var spinner = document.getElementById("btn-spinner");
+                    btn.disabled = true;
+                    btn.setAttribute("aria-busy", "true");
+                    text.textContent = "Signing in\u2026";
+                    if (spinner) spinner.hidden = false;
+                });
+        })();
+    </script>
+</body>
+</html>

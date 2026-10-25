@@ -1,0 +1,273 @@
+package app
+
+import (
+	"bufio"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+)
+
+type Config struct {
+	Host             string
+	Port             string
+	DBPath           string
+	SecretKey        string
+	TelegramAppID    int
+	TelegramAppHash  string
+	StorageChannelID int64
+	AdminPassword    string
+	CDNBaseURL       string
+	CDNPublic        bool
+	TLSCertFile      string
+	TLSKeyFile       string
+	// Paths carries resolved config/data directories (dev/user/system).
+	Paths *Paths
+	// Version is the build display version ("v2.1.0", "dev"); set by main
+	// from linker-injected metadata so the web layer can report it.
+	Version string
+}
+
+// LoadConfig reads configuration with production precedence:
+//
+//	real environment variables
+//	    ↓
+//	.env in the process working directory (legacy / source tree)
+//	    ↓
+//	.env in the production config directory (TDOCS_CONFIG_DIR / XDG / /etc)
+//	    ↓
+//	built-in defaults
+//
+// Real environment variables always win because loadDotEnv never overrides
+// keys that are already set.
+func LoadConfig() *Config {
+	paths := ResolvePaths()
+	for _, f := range paths.EnvFiles() {
+		loadDotEnv(f)
+	}
+
+	host := env3("TDOCS_HOST", "ROBDOCS_HOST", "TELEDRIVE_HOST", "0.0.0.0")
+	port := env3("TDOCS_PORT", "ROBDOCS_PORT", "TELEDRIVE_PORT", "8080")
+	dbPath := resolveDBPath(paths)
+	adminPass := env3("TDOCS_ADMIN_PASSWORD", "ROBDOCS_ADMIN_PASSWORD", "TELEDRIVE_ADMIN_PASSWORD", "admin123")
+
+	appID, _ := strconv.Atoi(firstSet("TDOCS_TG_APP_ID", "ROBDOCS_TG_APP_ID", "TELEDRIVE_TG_APP_ID", "app_api_id", "0"))
+	appHash := firstSet("TDOCS_TG_APP_HASH", "ROBDOCS_TG_APP_HASH", "TELEDRIVE_TG_APP_HASH", "app_api_hash", "")
+	channelID, _ := strconv.ParseInt(env3("TDOCS_STORAGE_CHANNEL_ID", "ROBDOCS_STORAGE_CHANNEL_ID", "TELEDRIVE_STORAGE_CHANNEL_ID", "0"), 10, 64)
+
+	return &Config{
+		Host:             host,
+		Port:             port,
+		DBPath:           dbPath,
+		SecretKey:        ResolveSecretKey(dbPath),
+		TelegramAppID:    appID,
+		TelegramAppHash:  appHash,
+		StorageChannelID: channelID,
+		AdminPassword:    adminPass,
+		CDNBaseURL:       strings.TrimSuffix(env3("TDOCS_CDN_BASE_URL", "ROBDOCS_CDN_BASE_URL", "TELEDRIVE_CDN_BASE_URL", ""), "/"),
+		CDNPublic:        env3("TDOCS_CDN_PUBLIC", "ROBDOCS_CDN_PUBLIC", "TELEDRIVE_CDN_PUBLIC", "true") != "false",
+		TLSCertFile:      env3("TDOCS_TLS_CERT_FILE", "ROBDOCS_TLS_CERT_FILE", "TELEDRIVE_TLS_CERT_FILE", ""),
+		TLSKeyFile:       env3("TDOCS_TLS_KEY_FILE", "ROBDOCS_TLS_KEY_FILE", "TELEDRIVE_TLS_KEY_FILE", ""),
+		Paths:            paths,
+	}
+}
+
+// resolveDBPath picks the SQLite file location:
+//
+//  1. TDOCS_DB_PATH (or legacy ROBDOCS_/TELEDRIVE_ names) — always wins
+//  2. A pre-existing database in the working directory (tdocs.db, then the
+//     pre-rebrand robdocs.db / teledrive.db) — never abandons an existing
+//     install that was started from its data folder
+//  3. dev mode: ./tdocs.db (source-tree behaviour unchanged)
+//  4. production: <DataDir>/tdocs.db (~/.local/share/tdocs or /var/lib/tdocs)
+func resolveDBPath(paths *Paths) string {
+	if v := os.Getenv("TDOCS_DB_PATH"); v != "" {
+		return v
+	}
+	if v := os.Getenv("ROBDOCS_DB_PATH"); v != "" {
+		return v
+	}
+	if v := os.Getenv("TELEDRIVE_DB_PATH"); v != "" {
+		return v
+	}
+	for _, name := range []string{"tdocs.db", "robdocs.db", "teledrive.db"} {
+		if _, err := os.Stat(name); err == nil {
+			return name
+		}
+	}
+	// Dev-tree convenience (database next to the checkout) applies only when
+	// no explicit data dir was given — an explicit TDOCS_DATA_DIR must win,
+	// otherwise CLI commands silently use a different database than configured.
+	if paths != nil && paths.Mode == "dev" && (paths.DataDir == "" || paths.DataDir == ".") {
+		return "tdocs.db"
+	}
+	dataDir := "."
+	if paths != nil && paths.DataDir != "" {
+		dataDir = paths.DataDir
+	}
+	return filepath.Join(dataDir, "tdocs.db")
+}
+
+// ResolveSecretKey implements the SECURITY.md key hierarchy without breaking
+// existing installs whose sessions were encrypted with the legacy default:
+// env TDOCS_SECRET_KEY > ROBDOCS_SECRET_KEY > TELEDRIVE_SECRET_KEY >
+// .tdocs.key > .robdocs.key > .teledrive.key > legacy default.
+func ResolveSecretKey(dbPath string) string {
+	if v := os.Getenv("TDOCS_SECRET_KEY"); v != "" {
+		return v
+	}
+	if v := os.Getenv("ROBDOCS_SECRET_KEY"); v != "" {
+		return v
+	}
+	if v := os.Getenv("TELEDRIVE_SECRET_KEY"); v != "" {
+		return v
+	}
+	for _, p := range keyFilePaths(dbPath) {
+		if key, err := os.ReadFile(p); err == nil {
+			if k := strings.TrimSpace(string(key)); k != "" {
+				return k
+			}
+		}
+	}
+	return "teledrive-default-local-secret-32b"
+}
+
+// EnsureSecretKey generates and persists a random .tdocs.key (0600) when no
+// secret is configured yet. Call after opening the DB on fresh installs only:
+// if hasSession is true the legacy default must keep working, so do nothing.
+func EnsureSecretKey(dbPath string, hasSession bool) (string, error) {
+	if v := os.Getenv("TDOCS_SECRET_KEY"); v != "" {
+		return v, nil
+	}
+	if v := os.Getenv("ROBDOCS_SECRET_KEY"); v != "" {
+		return v, nil
+	}
+	if v := os.Getenv("TELEDRIVE_SECRET_KEY"); v != "" {
+		return v, nil
+	}
+	paths := keyFilePaths(dbPath)
+	for _, p := range paths {
+		key, err := os.ReadFile(p)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("read session encryption key %s: %w", p, err)
+		}
+		if strings.TrimSpace(string(key)) == "" {
+			return "", fmt.Errorf("session encryption key %s is empty; restore the original key", p)
+		}
+		if err := prepareKeyFile(p, dbPath); err != nil {
+			return "", fmt.Errorf("secure session encryption key: %w", err)
+		}
+		return strings.TrimSpace(string(key)), nil
+	}
+	if hasSession {
+		return "teledrive-default-local-secret-32b", nil
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate session encryption key: %w", err)
+	}
+	key := hex.EncodeToString(buf)
+	path := paths[0]
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", fmt.Errorf("create key directory: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		return EnsureSecretKey(dbPath, hasSession)
+	}
+	if err != nil {
+		return "", fmt.Errorf("persist session encryption key: %w", err)
+	}
+	_, writeErr := file.WriteString(key + "\n")
+	if writeErr == nil {
+		writeErr = file.Sync()
+	}
+	closeErr := file.Close()
+	if writeErr != nil {
+		return "", fmt.Errorf("persist session encryption key: %w", writeErr)
+	}
+	if closeErr != nil {
+		return "", fmt.Errorf("close session encryption key: %w", closeErr)
+	}
+	if err := prepareKeyFile(path, dbPath); err != nil {
+		return "", fmt.Errorf("secure session encryption key: %w", err)
+	}
+	return key, nil
+}
+
+func keyFilePaths(dbPath string) []string {
+	if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+		return []string{filepath.Join(dir, ".tdocs.key"), filepath.Join(dir, ".robdocs.key"), filepath.Join(dir, ".teledrive.key")}
+	}
+	return []string{".tdocs.key", ".robdocs.key", ".teledrive.key"}
+}
+
+func keyFilePath(dbPath string) string { return keyFilePaths(dbPath)[0] }
+
+// env2 reads TDOCS_ first, then the legacy ROBDOCS_ name.
+func env2(primary, fallback, def string) string {
+	if v := os.Getenv(primary); v != "" {
+		return v
+	}
+	return getEnv(fallback, def)
+}
+
+// env3 reads TDOCS_ first, then ROBDOCS_, then the legacy TELEDRIVE_ name.
+func env3(primary, mid, legacy, def string) string {
+	if v := os.Getenv(primary); v != "" {
+		return v
+	}
+	if v := os.Getenv(mid); v != "" {
+		return v
+	}
+	return getEnv(legacy, def)
+}
+
+// loadDotEnv parses KEY=VALUE lines (ignoring comments/blanks, stripping quotes)
+// and exports keys that are not already set in the environment.
+func loadDotEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if i := strings.Index(line, "="); i > 0 {
+			k := strings.TrimSpace(line[:i])
+			v := strings.TrimSpace(line[i+1:])
+			v = strings.Trim(v, `"'`)
+			if _, exists := os.LookupEnv(k); !exists {
+				_ = os.Setenv(k, v)
+			}
+		}
+	}
+}
+
+// firstSet returns the first non-empty value among env keys, else fallback.
+func firstSet(keys ...string) string {
+	for _, k := range keys[:len(keys)-1] {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return keys[len(keys)-1]
+}
+
+func getEnv(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
+}
