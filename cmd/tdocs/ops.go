@@ -336,6 +336,10 @@ func runUpdate(cfg *app.Config, args []string) {
 						fmt.Fprintf(os.Stderr, "  ✕ Download failed: %v\n", dErr)
 						os.Exit(1)
 					}
+					// apt drops privileges to the _apt user to fetch a local
+					// package file; a 0700 temp dir / 0600 file blocks it
+					// and triggers the "unsandboxed" permission notice.
+					makePackageReadableForApt(tmp, pkgPath)
 					if sumsURL != "" {
 						sumsPath := filepath.Join(tmp, "SHA256SUMS")
 						if dErr := downloadFile(sumsURL, sumsPath); dErr == nil {
@@ -372,7 +376,7 @@ func runUpdate(cfg *app.Config, args []string) {
 						}
 					}
 					fmt.Printf("  ✓ Updated to %s via %s package\n", latest.Tag, kind)
-					fmt.Println("  ○ Restart the service if running: sudo systemctl restart tdocs")
+					restartServiceIfRunning()
 					return
 				}
 			}
@@ -464,7 +468,7 @@ func runUpdate(cfg *app.Config, args []string) {
 	}
 	_ = os.Chmod(exe, 0o755)
 	fmt.Printf("  ✓ Updated %s → %s (backup: %s)\n", exe, latest.Tag, backup)
-	fmt.Println("  ○ Restart the service if running: sudo systemctl restart tdocs")
+	restartServiceIfRunning()
 	fmt.Println("  ○ Database and configuration were not modified.")
 }
 
