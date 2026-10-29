@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Upload File — tDocs</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="stylesheet" href="/static/style.css?v=31">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <div class="auth-frame">
+            <section class="login-card" aria-labelledby="request-title">
+                <header class="login-header">
+                    <img class="login-logo" src="/static/logo-light.png" alt="tDocs" width="384" height="384">
+                    <h1 class="login-title" id="request-title">{{.Name}}</h1>
+                    <p class="login-subtitle">Someone asked you to upload a file. No sign-in needed.</p>
+                </header>
+                <div id="req-error" class="login-error" role="alert" hidden></div>
+                <div id="req-done" class="login-hint" hidden>Upload complete. Thank you!</div>
+                <div class="form-group">
+                    <label class="form-label" for="req-file">Choose a file</label>
+                    <input type="file" id="req-file" class="form-input">
+                </div>
+                <div id="req-progress" style="display:none; margin-bottom: 12px;">
+                    <div style="height: 8px; background: var(--border-soft); border-radius: 4px; overflow: hidden;">
+                        <div id="req-progress-bar" style="height: 100%; width: 0%; background: var(--primary);"></div>
+                    </div>
+                    <p id="req-progress-text" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;"></p>
+                </div>
+                <button type="button" class="btn btn-primary login-submit" id="req-upload-btn">Upload File</button>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">Files go straight to the owner's storage. This page never asks for a password.</p>
+            </section>
+        </div>
+    </main>
+    <script>
+    (function () {
+        const token = {{.TokenJSON}};
+        const fileEl = document.getElementById("req-file");
+        const btn = document.getElementById("req-upload-btn");
+        const errEl = document.getElementById("req-error");
+        const doneEl = document.getElementById("req-done");
+        const progEl = document.getElementById("req-progress");
+        const barEl = document.getElementById("req-progress-bar");
+        const txtEl = document.getElementById("req-progress-text");
+        function fail(msg) {
+            errEl.textContent = msg;
+            errEl.hidden = false;
+            btn.disabled = false;
+            btn.textContent = "Upload File";
+        }
+        btn.addEventListener("click", async () => {
+            const file = fileEl.files[0];
+            if (!file) { fail("Choose a file first."); return; }
+            errEl.hidden = true;
+            doneEl.hidden = true;
+            btn.disabled = true;
+            btn.textContent = "Uploading…";
+            progEl.style.display = "block";
+            try {
+                const initRes = await fetch(`/api/requests/${encodeURIComponent(token)}/upload/init`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: file.name, size: file.size, mime_type: file.type || "application/octet-stream" })
+                });
+                if (!initRes.ok) throw new Error(await initRes.text().then(t => t || "Upload could not start."));
+                const init = await initRes.json();
+                const chunkSize = init.chunk_size || 5 * 1024 * 1024;
+                let uploaded = 0;
+                for (let i = 0; i < init.total_chunks; i++) {
+                    const blob = file.slice(i * chunkSize, (i + 1) * chunkSize);
+                    const form = new FormData();
+                    form.append("session_id", init.session_id);
+                    form.append("chunk_index", String(i));
+                    form.append("chunk", blob, file.name);
+                    const chunkRes = await fetch(`/api/requests/${encodeURIComponent(token)}/upload/chunk`, { method: "POST", body: form });
+                    if (!chunkRes.ok) throw new Error(await chunkRes.text().then(t => t || `Chunk ${i + 1} failed.`));
+                    uploaded += blob.size;
+                    const pct = Math.round(uploaded / file.size * 100);
+                    barEl.style.width = pct + "%";
+                    txtEl.textContent = pct + "% uploaded";
+                }
+                const doneRes = await fetch(`/api/requests/${encodeURIComponent(token)}/upload/complete`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: init.session_id })
+                });
+                if (!doneRes.ok) throw new Error(await doneRes.text().then(t => t || "Could not finish the upload."));
+                doneEl.hidden = false;
+                fileEl.value = "";
+                btn.disabled = false;
+                btn.textContent = "Upload File";
+            } catch (e) {
+                fail(e.message || "Upload failed.");
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

@@ -143,6 +143,7 @@ func (s *Server) purgeFile(r *http.Request, id string) error {
 			_ = s.db.DeleteVersion(v.ID)
 		}
 	}
+	s.deleteDiskObject(f)
 	return s.db.DeleteFile(id)
 }
 
@@ -425,6 +426,31 @@ func (s *Server) handleCopyFile(w http.ResponseWriter, r *http.Request) {
 			}
 			folderID = body.FolderID
 		}
+	}
+	if src.StorageKind == "disk" {
+		// Disk copies duplicate the bytes; a catalog entry pointing at
+		// Telegram coordinates it does not have would be a broken file.
+		cp, err := s.db.CreateFileWithStorage(folderID, name, src.Size, src.MimeType, "disk", "", src.SHA256)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		rel, err := s.copyDiskObject(src, cp.ID)
+		if err != nil {
+			_ = s.db.DeleteFile(cp.ID)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := s.db.SetFileStorage(cp.ID, "disk", rel); err != nil {
+			_ = s.db.DeleteFile(cp.ID)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		cp.StorageKind = "disk"
+		cp.LocalPath = rel
+		s.audit(r, "file_copy", id+" -> "+cp.ID)
+		writeJSON(w, http.StatusCreated, cp)
+		return
 	}
 	cp, err := s.db.CreateFile(folderID, name, src.Size, src.MimeType,
 		src.TelegramMessageID, src.TelegramFileID, src.TelegramAccessHash, src.SHA256)

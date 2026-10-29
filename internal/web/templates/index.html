@@ -6,7 +6,7 @@
     <title>tDocs &mdash; Personal Cloud Storage</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="apple-touch-icon" href="/static/logo.png">
-    <link rel="stylesheet" href="/static/style.css?v=30">
+    <link rel="stylesheet" href="/static/style.css?v=31">
 </head>
 <body data-active-tab="overview">
 
@@ -39,6 +39,10 @@
                 <button type="button" class="nav-link nav-orange" id="nav-shares" onclick="switchTab('shares')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     <span>Shared Links</span>
+                </button>
+                <button type="button" class="nav-link nav-orange" id="nav-requests" onclick="switchTab('requests')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>File Requests</span>
                 </button>
                 <button type="button" class="nav-link nav-orange" id="nav-favorites" onclick="switchTab('favorites')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -95,6 +99,10 @@
                 <button type="button" class="nav-link nav-gray" id="nav-categories" onclick="switchTab('categories')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
                     <span>Categories</span>
+                </button>
+                <button type="button" class="nav-link nav-gray" id="nav-users" onclick="switchTab('users')">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Users</span>
                 </button>
                 <button type="button" class="nav-link nav-gray" id="nav-settings" onclick="switchTab('settings')">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg>
@@ -363,6 +371,9 @@
                         <option value="application/pdf">PDF</option>
                         <option value="document">Documents</option>
                     </select>
+                    <select id="filter-tag" class="form-input" style="max-width: 150px;" onchange="applyTagFilter()" title="Tag filter">
+                        <option value="">All tags</option>
+                    </select>
                     <select id="filter-size" class="form-input" style="max-width: 150px;" onchange="applyDriveFilters()" title="Size filter">
                         <option value="">Any size</option>
                         <option value="0-1048576">Under 1 MB</option>
@@ -585,6 +596,9 @@
                     <input id="tg-acct-phone" type="text" placeholder="Phone, e.g. +628123456789" style="flex: 1; min-width: 160px;" class="form-input">
                     <button class="btn btn-primary" onclick="addTelegramAccount()">Add Account</button>
                 </div>
+                <div class="section-header"><div class="section-title">Scheduled Mirror Backup</div><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="loadMirrorSchedule()">Refresh</button></div>
+                <p style="font-size: 0.86rem; color: var(--text-secondary); margin-bottom: 12px;">When enabled, tDocs periodically copies files that are not yet mirrored to every ready backup account. Mirror covers Telegram files only.</p>
+                <div id="mirror-schedule-box" style="margin-bottom: 18px;"></div>
                 <div class="section-header"><div class="section-title">Sync History</div><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="loadStorageCenter()">Refresh</button></div>
                 <div class="table-container">
                     <table class="data-table">
@@ -598,6 +612,23 @@
                     <h3>No sync runs recorded yet</h3>
                     <p style="font-size: 0.86rem; color: var(--text-muted);">Press Sync Now to rebuild the catalog from the Storage Channel.</p>
                 </div>
+            </div>
+
+            <!-- File Requests Tab -->
+            <div id="requests-content-container" style="display: none;">
+                <div class="section-header" style="margin-top: 0; margin-bottom: 18px;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; font-weight: 800;">File Requests</h2>
+                        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 3px;">Public links that let anyone upload into a folder without signing in.</p>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap;">
+                    <input type="text" id="req-name" class="form-input" placeholder="Request name, e.g. Homework submissions" style="flex: 2; min-width: 180px;">
+                    <select id="req-folder" class="form-input" style="flex: 1; min-width: 140px;"><option value="">Root folder</option></select>
+                    <input type="datetime-local" id="req-expires" class="form-input" style="flex: 1; min-width: 160px;" title="Optional expiry">
+                    <button class="btn btn-primary" onclick="createFileRequest()">Create Link</button>
+                </div>
+                <div id="requests-list"></div>
             </div>
 
             <!-- Trash Tab -->
@@ -646,6 +677,22 @@
                         <div style="display: flex; gap: 8px; margin-bottom: 12px;"><input type="text" id="new-token-name" class="form-input" placeholder="Token name"><button class="btn btn-primary" id="token-create-btn" onclick="createApiToken()">Create</button></div>
                         <div id="new-token-secret" style="display: none; margin-bottom: 12px;"><label class="form-label">Copy now. Never shown again</label><div style="display: flex; gap: 8px;"><input type="text" id="new-token-secret-input" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem;"><button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('new-token-secret-input').value)">Copy</button></div></div>
                         <div id="tokens-list"></div>
+                    </div>
+                    <div class="settings-card" id="users-section">
+                        <h3>Dashboard Users</h3>
+                        <p>Additional logins. Viewers can browse and download but cannot upload, edit or delete. The admin password remains the superuser.</p>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <input type="text" id="new-user-name" class="form-input" placeholder="Username" style="flex: 1; min-width: 120px;">
+                            <input type="password" id="new-user-pass" class="form-input" placeholder="Password (min 8 chars)" style="flex: 1; min-width: 140px;">
+                            <select id="new-user-role" class="form-input" style="max-width: 120px;"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+                            <button class="btn btn-primary" onclick="createDashboardUser()">Create</button>
+                        </div>
+                        <div id="users-list"></div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>Storage Backend</h3>
+                        <p>Where new uploads go. Existing files keep their backend. Disk files are not mirrored or snapshotted.</p>
+                        <div id="storage-backend-box"></div>
                     </div>
                     <div class="settings-card">
                         <h3>Active Sessions</h3>
@@ -955,6 +1002,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=23"></script>
+    <script src="/static/app.js?v=24"></script>
 </body>
 </html>

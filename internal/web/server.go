@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"tdocs/internal/app"
+	"tdocs/internal/crypto"
 	"tdocs/internal/db"
 	"tdocs/internal/storage"
 	"tdocs/internal/telegram"
@@ -260,6 +261,33 @@ func (s *Server) routes() {
 	// Self-update status for the dashboard banner (superuser only).
 	s.mux.HandleFunc("GET /api/update/status", s.superuserOnly(s.handleUpdateStatus))
 
+	// v3.2.0: tags, file requests, folder ZIP, Telegram send, mirror
+	// schedule, dashboard users, storage settings.
+	s.mux.HandleFunc("GET /api/files/{id}/tags", s.authMiddleware(s.handleListFileTags))
+	s.mux.HandleFunc("POST /api/files/{id}/tags", s.authMiddleware(s.handleAddFileTag))
+	s.mux.HandleFunc("DELETE /api/files/{id}/tags/{tag}", s.authMiddleware(s.handleRemoveFileTag))
+	s.mux.HandleFunc("GET /api/tags", s.authMiddleware(s.handleListAllTags))
+	s.mux.HandleFunc("GET /api/folders/{id}/zip", s.authMiddleware(s.handleFolderZip))
+	s.mux.HandleFunc("POST /api/files/{id}/telegram-send", s.superuserOnly(s.handleTelegramSend))
+	s.mux.HandleFunc("POST /api/file-requests", s.superuserOnly(s.handleCreateFileRequest))
+	s.mux.HandleFunc("GET /api/file-requests", s.superuserOnly(s.handleListFileRequests))
+	s.mux.HandleFunc("DELETE /api/file-requests/{id}", s.superuserOnly(s.handleDeleteFileRequest))
+	s.mux.HandleFunc("GET /api/telegram/mirror/schedule", s.superuserOnly(s.handleGetMirrorSchedule))
+	s.mux.HandleFunc("POST /api/telegram/mirror/schedule", s.superuserOnly(s.handleSetMirrorSchedule))
+	s.mux.HandleFunc("GET /api/users", s.superuserOnly(s.handleListUsers))
+	s.mux.HandleFunc("POST /api/users", s.superuserOnly(s.handleCreateUser))
+	s.mux.HandleFunc("DELETE /api/users/{id}", s.superuserOnly(s.handleDeleteUser))
+	s.mux.HandleFunc("PUT /api/users/{id}", s.superuserOnly(s.handleUpdateUser))
+	s.mux.HandleFunc("GET /api/settings/storage", s.authMiddleware(s.handleGetStorageSettings))
+	s.mux.HandleFunc("POST /api/settings/storage", s.superuserOnly(s.handleSetStorageSettings))
+
+	// Public file-request surface (token-authenticated, no login).
+	s.mux.HandleFunc("GET /r/{token}", s.handleRequestPage)
+	s.mux.HandleFunc("GET /api/requests/{token}", s.handlePublicFileRequest)
+	s.mux.HandleFunc("POST /api/requests/{token}/upload/init", s.handleRequestUploadInit)
+	s.mux.HandleFunc("POST /api/requests/{token}/upload/chunk", s.handleRequestUploadChunk)
+	s.mux.HandleFunc("POST /api/requests/{token}/upload/complete", s.handleRequestUploadComplete)
+
 	// API contract
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPIJSON)
 	s.mux.HandleFunc("GET /docs", s.handleDocs)
@@ -322,6 +350,14 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
+		// Viewer role (v3.2.0): a cookie session minted for a viewer user
+		// may read but never mutate. Bearer API tokens keep their existing
+		// admin-level behavior; the legacy admin session has an empty role
+		// and is treated as admin.
+		if cookieOK && sess.Role == "viewer" && isMutation(r) {
+			http.Error(w, "viewer accounts are read-only", http.StatusForbidden)
+			return
+		}
 		next(w, r)
 		return
 	}
@@ -359,12 +395,25 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	pwd := r.FormValue("password")
-	if s.adminPasswordOK(pwd) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	actor, role, ok := "admin", "", false
+	if username != "" {
+		// Dashboard user login (v3.2.0). Unknown usernames fall through
+		// to the generic failure page: no enumeration.
+		if user, err := s.db.GetUserByUsername(username); err == nil && crypto.VerifyPassword(user.PasswordHash, pwd) {
+			actor, role, ok = user.Username, user.Role, true
+		}
+	} else if s.adminPasswordOK(pwd) {
+		ok = true
+	}
+	if ok {
 		sess, err := s.sessions.Create(clientIP(r), r.UserAgent())
 		if err != nil {
 			http.Error(w, "Could not create session", http.StatusInternalServerError)
 			return
 		}
+		sess.Username = actor
+		sess.Role = role
 		secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 		http.SetCookie(w, &http.Cookie{
 			Name:     "tdocs_session",
@@ -386,7 +435,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   86400 * 30,
 		})
-		_ = s.db.Audit("admin", "login", "dashboard login from "+clientIP(r), clientIP(r))
+		_ = s.db.Audit(actor, "login", "dashboard login from "+clientIP(r), clientIP(r))
 		// A correct password clears the failed-attempt window: the operator is
 		// demonstrably not an attacker, and stale typos must not cause a later
 		// 429 that reads like a broken login.

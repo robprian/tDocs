@@ -8,7 +8,7 @@
     <title>tDocs | Sign In</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="apple-touch-icon" href="/static/logo.png">
-    <link rel="stylesheet" href="/static/style.css?v=27">
+    <link rel="stylesheet" href="/static/style.css?v=28">
 </head>
 <body class="auth-page">
     <main class="auth-shell">
@@ -51,6 +51,12 @@
                 </div>
 
                 <form class="login-form" method="POST" action="/login" id="login-form" autocomplete="on">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <input type="text" name="username" id="username" class="form-input"
+                               placeholder="Username (leave empty for admin)"
+                               autocomplete="username" spellcheck="false"
+                               aria-label="Username, optional">
+                    </div>
                     <div class="password-wrap">
                         <svg class="password-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
                         <input type="password" name="password" id="password" class="form-input"

@@ -58,6 +58,8 @@ const ICONS = {
     image: `<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>`,
     download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
     upload: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>`,
+    hash: `<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>`,
+    send: `<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>`,
     "share-2": `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
     "trash-2": `<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`,
     edit: `<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>`,
@@ -411,6 +413,7 @@ async function switchTab(tab) {
         media: "media-content-container",
         favorites: "favorites-content-container",
         shares: "shares-content-container",
+        requests: "requests-content-container",
         storage: "storage-content-container",
         snapshots: "snapshots-content-container",
         trash: "trash-content-container",
@@ -421,7 +424,7 @@ async function switchTab(tab) {
     // Sidebar aliases reuse existing containers: Recent shows the
     // Overview recent panel, Backups is the Snapshots view, Documents
     // and Categories are filtered/root views of Drive.
-    const aliasContainer = { recent: "overview", backups: "snapshots", documents: "drive", categories: "drive" };
+    const aliasContainer = { recent: "overview", backups: "snapshots", documents: "drive", categories: "drive", users: "settings" };
     const containerKey = MEDIA_TABS[tab] ? "media" : (aliasContainer[tab] || tab);
     for (const [name, id] of Object.entries(containers)) {
         const el = document.getElementById(id);
@@ -464,6 +467,11 @@ async function switchTab(tab) {
         loadFavorites();
     } else if (tab === "shares") {
         loadSharesContent();
+    } else if (tab === "requests") {
+        loadFileRequests();
+    } else if (tab === "users") {
+        await loadSettings();
+        document.getElementById("users-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (tab === "storage") {
         loadStorageCenter();
     } else if (tab === "snapshots") {
@@ -486,9 +494,13 @@ async function loadDriveContent() {
     skeletonRows(document.getElementById("table-body"), 6);
     try {
         const folderParam = currentFolderId ? `?folder_id=${currentFolderId}` : "";
+        const filesParams = new URLSearchParams();
+        if (currentFolderId) filesParams.set("folder_id", currentFolderId);
+        if (driveTagFilter && !activeSearchQuery) filesParams.set("tag", driveTagFilter);
+        const filesQuery = filesParams.toString() ? `?${filesParams.toString()}` : "";
         const [foldersRes, filesRes] = await Promise.all([
             apiFetch(`/api/folders${folderParam}`),
-            apiFetch(`/api/files${folderParam}`)
+            apiFetch(`/api/files${filesQuery}`)
         ]);
 
         if (!foldersRes.ok || !filesRes.ok) throw new Error("Failed to fetch files/folders");
@@ -515,6 +527,7 @@ async function loadDriveContent() {
 
         renderBreadcrumbs();
         renderActiveView();
+        loadTagOptions();
     } catch (err) {
         showToast("Error loading files: " + err.message, "error");
     }
@@ -717,6 +730,7 @@ function renderFoldersGrid(folders) {
             <div class="card-top">
                 <div class="card-icon-wrap tile-blue">${getIcon("folder")}</div>
                 <div class="card-actions" onclick="event.stopPropagation()">
+                    <button class="btn-icon" title="Download ZIP" onclick="downloadFolderZip('${f.id}', '${ja(f.name)}')">${getIcon("download", "icon-sm")}</button>
                     <button class="btn-icon" title="More actions" onclick="showCtxMenu(event, 'folder', '${f.id}', this.closest('.card'))">${getIcon("more-vertical", "icon-sm")}</button>
                 </div>
             </div>
@@ -744,6 +758,8 @@ function fileCardHTML(f, opts = {}) {
                     <button class="btn-icon" title="${fav ? "Unstar" : "Star"}" onclick="toggleFavorite('${f.id}', ${!fav})" style="${fav ? "color: var(--warning);" : ""}">${getIcon("star", "icon-sm")}</button>
                     <button class="btn-icon" title="Details" onclick="openDetailsDrawer('${f.id}')">${getIcon("eye", "icon-sm")}</button>
                     <button class="btn-icon" title="Share Link" onclick="openShareModal('${f.id}', '${ja(f.name)}')">${getIcon("share-2", "icon-sm")}</button>
+                    <button class="btn-icon" title="Add tag" onclick="promptTagFile('${f.id}', '${ja(f.name)}')">${getIcon("hash", "icon-sm")}</button>
+                    <button class="btn-icon" title="Send to Telegram" onclick="promptTelegramSend('${f.id}', '${ja(f.name)}')">${getIcon("send", "icon-sm")}</button>
                     <button class="btn-icon" title="Download" onclick="downloadFile('${f.id}', '${ja(f.name)}')">${getIcon("download", "icon-sm")}</button>
                     <button class="btn-icon" title="Rename" onclick="promptRenameFile('${f.id}', '${ja(f.name)}')">${getIcon("edit", "icon-sm")}</button>
                     <button class="btn-icon" title="Move to Trash" onclick="confirmDeleteFile('${f.id}', '${ja(f.name)}')">${getIcon("trash-2", "icon-sm")}</button>
@@ -809,6 +825,7 @@ function renderTableList(folders, files) {
                 <td style="color: var(--text-muted);">${formatDate(f.updated_at || f.created_at)}</td>
                 <td onclick="event.stopPropagation()">
                     <div style="display: flex; gap: 4px;">
+                        <button class="btn-icon" title="Download ZIP" onclick="event.stopPropagation(); downloadFolderZip('${f.id}', '${ja(f.name)}')">${getIcon("download", "icon-sm")}</button>
                         <button class="btn-icon" title="Rename" onclick="promptRenameFolder('${f.id}', '${ja(f.name)}')">${getIcon("edit", "icon-sm")}</button>
                         <button class="btn-icon" title="Delete" onclick="confirmDeleteFolder('${f.id}', '${ja(f.name)}')">${getIcon("trash-2", "icon-sm")}</button>
                     </div>
@@ -839,6 +856,8 @@ function renderTableList(folders, files) {
                         <button class="btn-icon" title="${fav ? "Unstar" : "Star"}" onclick="toggleFavorite('${f.id}', ${!fav})" style="${fav ? "color: var(--warning);" : ""}">${getIcon("star", "icon-sm")}</button>
                         <button class="btn-icon" title="Details" onclick="openDetailsDrawer('${f.id}')">${getIcon("eye", "icon-sm")}</button>
                         <button class="btn-icon" title="Share Link" onclick="openShareModal('${f.id}', '${ja(f.name)}')">${getIcon("share-2", "icon-sm")}</button>
+                        <button class="btn-icon" title="Add tag" onclick="promptTagFile('${f.id}', '${ja(f.name)}')">${getIcon("hash", "icon-sm")}</button>
+                        <button class="btn-icon" title="Send to Telegram" onclick="promptTelegramSend('${f.id}', '${ja(f.name)}')">${getIcon("send", "icon-sm")}</button>
                         <button class="btn-icon" title="Download" onclick="downloadFile('${f.id}', '${ja(f.name)}')">${getIcon("download", "icon-sm")}</button>
                         <button class="btn-icon" title="Rename" onclick="promptRenameFile('${f.id}', '${ja(f.name)}')">${getIcon("edit", "icon-sm")}</button>
                         <button class="btn-icon" title="Move to Trash" onclick="confirmDeleteFile('${f.id}', '${ja(f.name)}')">${getIcon("trash-2", "icon-sm")}</button>
@@ -2645,6 +2664,7 @@ async function loadStorageCenter() {
         showToast("Sync Center failed: " + err.message, "error");
     }
     loadTelegramAccounts();
+    loadMirrorSchedule();
 }
 
 async function syncCenterNow() {
@@ -2723,6 +2743,8 @@ async function loadSettings() {
     loadTokensList();
     loadAuditLog();
     loadDomainSettings();
+    loadUsersList();
+    loadStorageSettings();
     try {
         const res = await apiFetch("/api/health");
         const h = await res.json();
@@ -3261,6 +3283,7 @@ async function applyDriveFilters() {
     try {
         const params = new URLSearchParams();
         if (currentFolderId) params.set("folder_id", currentFolderId);
+        if (driveTagFilter) params.set("tag", driveTagFilter);
         if (mime) params.set("mime", mime);
         if (minSize) params.set("min_size", minSize);
         if (maxSize) params.set("max_size", maxSize);
@@ -3278,11 +3301,346 @@ async function applyDriveFilters() {
 function clearDriveFilters() {
     const m = document.getElementById("filter-mime");
     const s = document.getElementById("filter-size");
+    const t = document.getElementById("filter-tag");
     if (m) m.value = "";
     if (s) s.value = "";
+    if (t) t.value = "";
+    driveTagFilter = "";
     const status = document.getElementById("filter-status");
     if (status) status.innerText = "";
     loadDriveContent();
+}
+
+// ================= v3.2.0: folder ZIP, tags, Telegram send =================
+let driveTagFilter = "";
+
+function downloadFolderZip(folderId) {
+    window.location.href = `/api/folders/${encodeURIComponent(folderId)}/zip`;
+}
+
+async function loadTagOptions() {
+    const sel = document.getElementById("filter-tag");
+    if (!sel) return;
+    try {
+        const res = await apiFetch("/api/tags");
+        if (!res.ok) return;
+        const tags = await res.json() || [];
+        sel.innerHTML = `<option value="">All tags</option>` + tags.map(t =>
+            `<option value="${escapeHtml(t.tag)}" ${t.tag === driveTagFilter ? "selected" : ""}>${escapeHtml(t.tag)} (${t.count})</option>`).join("");
+    } catch (e) { /* tag filter is optional */ }
+}
+
+function applyTagFilter() {
+    const sel = document.getElementById("filter-tag");
+    driveTagFilter = sel ? sel.value : "";
+    loadDriveContent();
+}
+
+async function promptTagFile(fileId, fileName) {
+    const tag = window.prompt(`Add a tag to "${fileName}" (lowercase letters, digits, dash, underscore):`);
+    if (!tag) return;
+    try {
+        const res = await apiFetch(`/api/files/${encodeURIComponent(fileId)}/tags`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tag })
+        });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || "Add tag failed");
+        }
+        showToast(`Tag added to ${fileName}`, "success");
+        loadTagOptions();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+async function promptTelegramSend(fileId, fileName) {
+    const target = window.prompt(`Send "${fileName}" to a Telegram chat (@username works best):`);
+    if (!target) return;
+    try {
+        const res = await apiFetch(`/api/files/${encodeURIComponent(fileId)}/telegram-send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Send failed");
+        showToast(`Sent to ${target} (message ${data.message_id})`, "success", 5000);
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+// ================= v3.2.0: file requests =================
+function requestPublicLink(token) {
+    return `${window.location.origin}/r/${token}`;
+}
+
+function copyRequestLink(token) {
+    copyToClipboard(requestPublicLink(token));
+}
+
+async function loadFileRequests() {
+    const box = document.getElementById("requests-list");
+    const folderSel = document.getElementById("req-folder");
+    if (!box) return;
+    box.innerHTML = `<p style="font-size:0.8rem;color:var(--text-muted);">Loading…</p>`;
+    try {
+        const [res, foldersRes] = await Promise.all([apiFetch("/api/file-requests"), apiFetch("/api/folders")]);
+        if (res.status === 403) {
+            box.innerHTML = `<p style="font-size:0.86rem;color:var(--text-muted);">File requests are managed by the administrator.</p>`;
+            return;
+        }
+        if (!res.ok) throw new Error("Failed to load file requests");
+        const list = await res.json() || [];
+        if (folderSel && foldersRes.ok) {
+            const folders = await foldersRes.json() || [];
+            folderSel.innerHTML = `<option value="">Root folder</option>` + folders.map(f =>
+                `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join("");
+        }
+        if (!list.length) {
+            box.innerHTML = `<div class="empty-state"><h3>No file requests yet</h3><p style="font-size:0.86rem;color:var(--text-muted);">Create a link above and share it with anyone.</p></div>`;
+            return;
+        }
+        box.innerHTML = list.map(r => `
+            <div class="version-row">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:0.86rem;">${escapeHtml(r.name)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);word-break:break-all;">${escapeHtml(requestPublicLink(r.token))}${r.expires_at ? ` &bull; expires ${formatDateTime(r.expires_at)}` : " &bull; no expiry"}</div>
+                </div>
+                <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.72rem;" onclick="copyRequestLink('${escapeHtml(r.token)}')">Copy link</button>
+                <button class="btn-icon btn-danger" style="width:28px;height:28px;" title="Delete request" onclick="deleteFileRequest('${escapeHtml(r.id)}', '${ja(r.name)}')">${getIcon("x", "icon-sm")}</button>
+            </div>`).join("");
+    } catch (err) {
+        box.innerHTML = `<p style="font-size:0.8rem;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function createFileRequest() {
+    const nameEl = document.getElementById("req-name");
+    const folderEl = document.getElementById("req-folder");
+    const expiresEl = document.getElementById("req-expires");
+    const name = nameEl ? nameEl.value.trim() : "";
+    if (!name) {
+        showToast("Enter a request name", "error");
+        return;
+    }
+    const body = { name };
+    if (folderEl && folderEl.value) body.folder_id = folderEl.value;
+    if (expiresEl && expiresEl.value) body.expires_at = new Date(expiresEl.value).toISOString();
+    try {
+        const res = await apiFetch("/api/file-requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || "Create failed");
+        }
+        if (nameEl) nameEl.value = "";
+        if (expiresEl) expiresEl.value = "";
+        showToast("File request link created", "success");
+        loadFileRequests();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+async function deleteFileRequest(id, name) {
+    if (!window.confirm(`Delete the file request "${name}"? Its link stops working.`)) return;
+    try {
+        const res = await apiFetch(`/api/file-requests/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+        showToast("File request deleted", "success");
+        loadFileRequests();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+// ================= v3.2.0: mirror schedule =================
+async function loadMirrorSchedule() {
+    const box = document.getElementById("mirror-schedule-box");
+    if (!box) return;
+    box.innerHTML = `<p style="font-size:0.8rem;color:var(--text-muted);">Loading…</p>`;
+    try {
+        const res = await apiFetch("/api/telegram/mirror/schedule");
+        if (res.status === 403) {
+            box.innerHTML = `<p style="font-size:0.86rem;color:var(--text-muted);">Mirror schedule is managed by the administrator.</p>`;
+            return;
+        }
+        if (!res.ok) throw new Error("Failed to load mirror schedule");
+        const d = await res.json();
+        box.innerHTML = `
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                <label style="display:flex;gap:6px;align-items:center;font-size:0.86rem;"><input type="checkbox" id="mirror-sched-enabled" ${d.enabled ? "checked" : ""}> Enabled</label>
+                <div class="form-group" style="margin:0;"><label class="form-label">Interval (hours)</label><input type="number" id="mirror-sched-interval" class="form-input" min="1" max="168" value="${d.interval_hours || 24}" style="max-width:120px;"></div>
+                <button class="btn btn-primary" onclick="saveMirrorSchedule()">Save Schedule</button>
+                <span style="font-size:0.78rem;color:var(--text-muted);">${d.last_run ? `Last run: ${formatDateTime(d.last_run)}` : "Never run"}</span>
+            </div>`;
+    } catch (err) {
+        box.innerHTML = `<p style="font-size:0.8rem;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function saveMirrorSchedule() {
+    const enabledEl = document.getElementById("mirror-sched-enabled");
+    const intervalEl = document.getElementById("mirror-sched-interval");
+    const body = {
+        enabled: enabledEl ? enabledEl.checked : false,
+        interval_hours: intervalEl ? parseInt(intervalEl.value, 10) : 24
+    };
+    try {
+        const res = await apiFetch("/api/telegram/mirror/schedule", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || "Save failed");
+        }
+        showToast("Mirror schedule saved", "success");
+        loadMirrorSchedule();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+// ================= v3.2.0: dashboard users + storage backend =================
+async function loadUsersList() {
+    const box = document.getElementById("users-list");
+    if (!box) return;
+    try {
+        const res = await apiFetch("/api/users");
+        if (res.status === 403) {
+            box.innerHTML = `<p style="font-size:0.8rem;color:var(--text-muted);">Users are managed by the administrator.</p>`;
+            return;
+        }
+        if (!res.ok) throw new Error("Failed to load users");
+        const list = await res.json() || [];
+        box.innerHTML = list.length === 0
+            ? `<p style="font-size:0.8rem;color:var(--text-muted);">No dashboard users yet.</p>`
+            : list.map(u => `
+                <div class="session-row">
+                    <span style="color: var(--primary);">${getIcon("user", "icon-sm")}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:0.8rem;">${escapeHtml(u.username)} <span style="color:var(--text-muted);font-weight:400;">(${escapeHtml(u.role)})</span></div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);">created ${formatDateTime(u.created_at)}</div>
+                    </div>
+                    <select class="form-input" style="max-width:110px;" onchange="updateDashboardUserRole('${escapeHtml(u.id)}', this.value)">
+                        <option value="viewer" ${u.role === "viewer" ? "selected" : ""}>Viewer</option>
+                        <option value="admin" ${u.role === "admin" ? "selected" : ""}>Admin</option>
+                    </select>
+                    <button class="btn-icon btn-danger" style="width:28px;height:28px;" title="Delete user" onclick="deleteDashboardUser('${escapeHtml(u.id)}', '${ja(u.username)}')">${getIcon("x", "icon-sm")}</button>
+                </div>`).join("");
+    } catch (err) {
+        box.innerHTML = `<p style="font-size:0.8rem;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function createDashboardUser() {
+    const nameEl = document.getElementById("new-user-name");
+    const passEl = document.getElementById("new-user-pass");
+    const roleEl = document.getElementById("new-user-role");
+    const username = nameEl ? nameEl.value.trim() : "";
+    const password = passEl ? passEl.value : "";
+    if (!username || !password) {
+        showToast("Enter a username and password", "error");
+        return;
+    }
+    try {
+        const res = await apiFetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, role: roleEl ? roleEl.value : "viewer" })
+        });
+        if (res.status === 409) throw new Error("Username already exists");
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || "Create failed");
+        }
+        if (nameEl) nameEl.value = "";
+        if (passEl) passEl.value = "";
+        showToast(`User ${username} created`, "success");
+        loadUsersList();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+async function deleteDashboardUser(id, username) {
+    if (!window.confirm(`Delete user "${username}"? Their sessions stop working.`)) return;
+    try {
+        const res = await apiFetch(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+        showToast("User deleted", "success");
+        loadUsersList();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+async function updateDashboardUserRole(id, role) {
+    try {
+        const res = await apiFetch(`/api/users/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role })
+        });
+        if (!res.ok) throw new Error("Role update failed");
+        showToast("Role updated", "success");
+    } catch (err) {
+        showToast(err.message, "error");
+        loadUsersList();
+    }
+}
+
+async function loadStorageSettings() {
+    const box = document.getElementById("storage-backend-box");
+    if (!box) return;
+    try {
+        const res = await apiFetch("/api/settings/storage");
+        if (!res.ok) throw new Error("Failed to load storage settings");
+        const d = await res.json();
+        box.innerHTML = `
+            <div class="form-group"><label class="form-label">Backend for new uploads</label>
+                <select id="set-storage-backend" class="form-input">
+                    <option value="telegram" ${d.backend === "telegram" ? "selected" : ""}>Telegram channel</option>
+                    <option value="disk" ${d.backend === "disk" ? "selected" : ""}>Local disk</option>
+                </select></div>
+            <div class="form-group"><label class="form-label">Disk path (when backend is disk; empty means next to the database)</label>
+                <input type="text" id="set-disk-path" class="form-input" placeholder="e.g. /var/lib/tdocs/files" value="${escapeHtml(d.disk_path || "")}" autocomplete="off" spellcheck="false"></div>
+            <button class="btn btn-primary" onclick="saveStorageSettings()">Save Storage Settings</button>
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">Current backend: ${escapeHtml(d.backend || "telegram")}. Changing this affects new uploads only.</p>`;
+    } catch (err) {
+        box.innerHTML = `<p style="font-size:0.8rem;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function saveStorageSettings() {
+    const backendEl = document.getElementById("set-storage-backend");
+    const pathEl = document.getElementById("set-disk-path");
+    const body = { backend: backendEl ? backendEl.value : "telegram" };
+    if (pathEl && pathEl.value.trim()) body.disk_path = pathEl.value.trim();
+    try {
+        const res = await apiFetch("/api/settings/storage", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || "Save failed");
+        }
+        showToast("Storage settings saved", "success");
+        loadStorageSettings();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
 }
 
 // ================= Notifications + avatar =================

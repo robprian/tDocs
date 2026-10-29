@@ -152,6 +152,19 @@ func (s *Server) handleCDNStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if file.StorageKind == "disk" {
+		w.Header().Set("Content-Type", file.MimeType)
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		s.serveDiskFile(w, r, file, false)
+		return
+	}
+
 	docID, docHash := parseDocCoords(file.TelegramFileID, file.TelegramAccessHash)
 
 	w.Header().Set("Content-Type", file.MimeType)
@@ -212,6 +225,18 @@ func (s *Server) handleCDNDownload(w http.ResponseWriter, r *http.Request) {
 	file, err := s.db.GetFile(r.PathValue("id"))
 	if err != nil {
 		http.NotFound(w, r)
+		return
+	}
+	if file.StorageKind == "disk" {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", file.Name))
+		w.Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		s.serveDiskFile(w, r, file, true)
 		return
 	}
 	if err := s.telegramReady(); err != nil {

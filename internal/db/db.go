@@ -135,6 +135,44 @@ CREATE TABLE IF NOT EXISTS backup_copies (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (file_id, account_id)
 );
+
+-- v3.2.0: file tags (free-form labels, one row per file+tag).
+CREATE TABLE IF NOT EXISTS file_tags (
+    file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (file_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_file_tags_tag ON file_tags(tag);
+
+-- v3.2.0: file requests (public upload links into one folder).
+CREATE TABLE IF NOT EXISTS file_requests (
+    id TEXT PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    folder_id TEXT NULL REFERENCES folders(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    expires_at DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_file_requests_token ON file_requests(token);
+
+-- v3.2.0: maps a public-upload session to its file request token so the
+-- chunk/complete endpoints can authorize without an admin session.
+CREATE TABLE IF NOT EXISTS request_sessions (
+    session_id TEXT PRIMARY KEY,
+    token TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- v3.2.0: dashboard users. The legacy admin password keeps working as the
+-- bootstrap superuser; users have role "admin" or "viewer" (read-only).
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 // SchemaVersion is the schema level this binary understands. It is stored in
@@ -184,6 +222,9 @@ func Open(path string) (*DB, error) {
 		`ALTER TABLE files ADD COLUMN deleted_at DATETIME NULL`,
 		`ALTER TABLE folders ADD COLUMN deleted_at DATETIME NULL`,
 		`ALTER TABLE share_links ADD COLUMN preview_only INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE files ADD COLUMN storage_kind TEXT NOT NULL DEFAULT 'telegram'`,
+		`ALTER TABLE files ADD COLUMN local_path TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE upload_sessions ADD COLUMN storage_kind TEXT NOT NULL DEFAULT 'telegram'`,
 	} {
 		if _, err := sdb.Exec(stmt); err != nil &&
 			!strings.Contains(err.Error(), "duplicate column name") {

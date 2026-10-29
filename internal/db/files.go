@@ -18,29 +18,36 @@ type Folder struct {
 }
 
 type File struct {
-	ID                 string    `json:"id"`
-	FolderID           *string   `json:"folder_id"`
-	Name               string    `json:"name"`
-	Size               int64     `json:"size"`
-	MimeType           string    `json:"mime_type"`
-	TelegramMessageID  int       `json:"telegram_message_id"`
-	TelegramFileID     string    `json:"telegram_file_id"`
-	TelegramAccessHash string    `json:"telegram_access_hash"`
-	SHA256             string    `json:"sha256"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                 string  `json:"id"`
+	FolderID           *string `json:"folder_id"`
+	Name               string  `json:"name"`
+	Size               int64   `json:"size"`
+	MimeType           string  `json:"mime_type"`
+	TelegramMessageID  int     `json:"telegram_message_id"`
+	TelegramFileID     string  `json:"telegram_file_id"`
+	TelegramAccessHash string  `json:"telegram_access_hash"`
+	SHA256             string  `json:"sha256"`
+	// StorageKind is "telegram" (default) or "disk". Disk files live under
+	// the configured disk storage root; LocalPath is relative to it.
+	StorageKind string    `json:"storage_kind"`
+	LocalPath   string    `json:"local_path"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type UploadSession struct {
-	ID             string    `json:"id"`
-	FolderID       *string   `json:"folder_id"`
-	Name           string    `json:"name"`
-	Size           int64     `json:"size"`
-	MimeType       string    `json:"mime_type"`
-	TotalParts     int       `json:"total_parts"`
-	UploadedParts  int       `json:"uploaded_parts"`
-	TelegramFileID int64     `json:"telegram_file_id"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string  `json:"id"`
+	FolderID       *string `json:"folder_id"`
+	Name           string  `json:"name"`
+	Size           int64   `json:"size"`
+	MimeType       string  `json:"mime_type"`
+	TotalParts     int     `json:"total_parts"`
+	UploadedParts  int     `json:"uploaded_parts"`
+	TelegramFileID int64   `json:"telegram_file_id"`
+	// StorageKind mirrors File.StorageKind for the in-flight upload so a
+	// backend switch mid-upload cannot silently reroute its chunks.
+	StorageKind string    `json:"storage_kind"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type ShareLink struct {
@@ -264,11 +271,11 @@ func (d *DB) CreateFile(folderID *string, name string, size int64, mimeType stri
 // GetFile retrieves a live file by ID (trashed files are hidden).
 func (d *DB) GetFile(id string) (*File, error) {
 	row := d.QueryRow(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE id = ? AND deleted_at IS NULL
 	`, id)
 	var f File
-	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &f, nil
@@ -277,11 +284,11 @@ func (d *DB) GetFile(id string) (*File, error) {
 // GetFileAny retrieves a file regardless of trash state (restore flows).
 func (d *DB) GetFileAny(id string) (*File, error) {
 	row := d.QueryRow(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE id = ?
 	`, id)
 	var f File
-	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &f, nil
@@ -293,12 +300,12 @@ func (d *DB) ListFiles(folderID *string) ([]File, error) {
 	var err error
 	if folderID == nil {
 		rows, err = d.Query(`
-			SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+			SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 			FROM files WHERE folder_id IS NULL AND deleted_at IS NULL ORDER BY name ASC
 		`)
 	} else {
 		rows, err = d.Query(`
-			SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+			SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 			FROM files WHERE folder_id = ? AND deleted_at IS NULL ORDER BY name ASC
 		`, *folderID)
 	}
@@ -310,7 +317,7 @@ func (d *DB) ListFiles(folderID *string) ([]File, error) {
 	var files []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)
@@ -343,7 +350,7 @@ func (d *DB) ListAllFiles(search, mime string, limit int) ([]File, error) {
 	}
 	args = append(args, limit)
 	rows, err := d.Query(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE deleted_at IS NULL`+cond+` ORDER BY created_at DESC LIMIT ?
 	`, args...)
 	if err != nil {
@@ -354,7 +361,7 @@ func (d *DB) ListAllFiles(search, mime string, limit int) ([]File, error) {
 	var files []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)
@@ -374,11 +381,11 @@ func (d *DB) CountFiles() (int, error) {
 // already tracked locally.
 func (d *DB) GetFileByTelegramMessageID(msgID int) (*File, error) {
 	row := d.QueryRow(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE telegram_message_id = ?
 	`, msgID)
 	var f File
-	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+	if err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &f, nil
@@ -431,6 +438,9 @@ func (d *DB) MoveFile(id string, newFolderID *string) error {
 
 // DeleteFile removes a file record.
 func (d *DB) DeleteFile(id string) error {
+	if _, err := d.Exec("DELETE FROM file_tags WHERE file_id = ?", id); err != nil {
+		return err
+	}
 	_, err := d.Exec("DELETE FROM files WHERE id = ?", id)
 	return err
 }
@@ -470,7 +480,7 @@ func (d *DB) SearchFilesFiltered(query, mime string, minSize, maxSize int64, sin
 		args = append(args, since)
 	}
 	rows, err := d.Query(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE 1 = 1`+cond+` ORDER BY updated_at DESC LIMIT 100
 	`, args...)
 	if err != nil {
@@ -481,7 +491,7 @@ func (d *DB) SearchFilesFiltered(query, mime string, minSize, maxSize int64, sin
 	var files []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)
@@ -525,13 +535,20 @@ func (d *DB) IncrementUploadPart(id string) (int, error) {
 func (d *DB) GetUploadSession(id string) (*UploadSession, error) {
 	var s UploadSession
 	err := d.QueryRow(`
-		SELECT id, folder_id, name, size, mime_type, total_parts, uploaded_parts, telegram_file_id, created_at
+		SELECT id, folder_id, name, size, mime_type, total_parts, uploaded_parts, telegram_file_id, storage_kind, created_at
 		FROM upload_sessions WHERE id = ?
-	`, id).Scan(&s.ID, &s.FolderID, &s.Name, &s.Size, &s.MimeType, &s.TotalParts, &s.UploadedParts, &s.TelegramFileID, &s.CreatedAt)
+	`, id).Scan(&s.ID, &s.FolderID, &s.Name, &s.Size, &s.MimeType, &s.TotalParts, &s.UploadedParts, &s.TelegramFileID, &s.StorageKind, &s.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &s, nil
+}
+
+// SetUploadSessionStorageKind pins the backend an in-flight upload writes
+// to, so a settings change mid-upload cannot reroute its chunks.
+func (d *DB) SetUploadSessionStorageKind(id, kind string) error {
+	_, err := d.Exec(`UPDATE upload_sessions SET storage_kind = ? WHERE id = ?`, kind, id)
+	return err
 }
 
 // DeleteUploadSession cleans up an upload session.

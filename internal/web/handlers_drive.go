@@ -110,6 +110,25 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 	minSize, _ := strconv.ParseInt(q.Get("min_size"), 10, 64)
 	maxSize, _ := strconv.ParseInt(q.Get("max_size"), 10, 64)
 	since := q.Get("since") // YYYY-MM-DD prefix filter on updated_at
+	// Tag filter (v3.2.0) scopes to the same folder as the plain listing.
+	// It takes precedence over the search filters when both are given.
+	if tag := q.Get("tag"); tag != "" {
+		var folderID *string
+		if f := q.Get("folder_id"); f != "" {
+			folderID = &f
+		}
+		files, err := s.db.ListFilesByTag(tag, folderID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if files == nil {
+			files = []db.File{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(files)
+		return
+	}
 	if search != "" || mime != "" || minSize > 0 || maxSize > 0 || since != "" {
 		if since != "" && len(since) == 10 {
 			since += " 00:00:00"
@@ -209,6 +228,10 @@ func (s *Server) handleFileStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
+	if file.StorageKind == "disk" {
+		s.serveDiskFile(w, r, file, false)
+		return
+	}
 	if err := s.telegramReady(); err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -288,6 +311,10 @@ func (s *Server) handleFileDownload(w http.ResponseWriter, r *http.Request) {
 	file, err := s.db.GetFile(id)
 	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	if file.StorageKind == "disk" {
+		s.serveDiskFile(w, r, file, true)
 		return
 	}
 	if err := s.telegramReady(); err != nil {

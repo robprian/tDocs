@@ -27,6 +27,10 @@ type WebSession struct {
 	LastSeen  time.Time
 	IP        string
 	UserAgent string
+	// Username/Role describe a dashboard user login (v3.2.0). Empty role
+	// means the legacy admin-password session, which is always admin.
+	Username string
+	Role     string
 }
 
 type SessionStore struct {
@@ -261,8 +265,10 @@ func (s *Server) bearerTokenOK(r *http.Request) bool {
 // storage backend or drive an MTProto login. That asymmetry is what makes the
 // Telegram configuration surface superuser-only.
 func (s *Server) isSuperuser(r *http.Request) bool {
-	if _, ok := s.cookieSession(r); ok {
-		return true
+	// A cookie session proves operator intent only when it is not a
+	// viewer session (v3.2.0): viewer users may read, never administer.
+	if sess, ok := s.cookieSession(r); ok {
+		return sess.Role != "viewer"
 	}
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return s.adminPasswordOK(strings.TrimPrefix(h, "Bearer "))

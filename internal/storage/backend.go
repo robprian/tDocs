@@ -70,4 +70,9 @@ type Backend interface {
 
 	// DeleteChannelMessage removes one object message (purge support).
 	DeleteChannelMessage(ctx context.Context, msgID int) error
+
+	// SendFileToChat uploads bytes as a new document and sends it to a
+	// user/channel peer (username or numeric user ID). Telegram has no
+	// server-side copy between arbitrary peers, so this re-uploads.
+	SendFileToChat(ctx context.Context, target string, r io.Reader, size int64, fileName, mimeType string, limiter *telegram.SafeLimiter) (int, error)
 }

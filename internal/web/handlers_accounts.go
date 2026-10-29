@@ -326,9 +326,15 @@ func (s *Server) runBackupPass(acct telegram.TelegramAccount, fileID string, job
 			s.backupMu.Unlock()
 			return
 		}
+		if f.StorageKind == "disk" {
+			s.backupMu.Lock()
+			job.LastError = "disk file skipped: mirror covers Telegram files only"
+			s.backupMu.Unlock()
+			return
+		}
 		files = []db.File{*f}
 	} else {
-		rows, err := s.db.Query(`SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at FROM files WHERE deleted_at IS NULL ORDER BY created_at DESC`)
+		rows, err := s.db.Query(`SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at FROM files WHERE deleted_at IS NULL ORDER BY created_at DESC`)
 		if err != nil {
 			s.backupMu.Lock()
 			job.LastError = err.Error()
@@ -338,7 +344,7 @@ func (s *Server) runBackupPass(acct telegram.TelegramAccount, fileID string, job
 		defer rows.Close()
 		for rows.Next() {
 			var f db.File
-			if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 				continue
 			}
 			files = append(files, f)
@@ -355,6 +361,11 @@ func (s *Server) runBackupPass(acct telegram.TelegramAccount, fileID string, job
 	mgr := reg.ManagerFor(acct)
 	ctx := context.Background()
 	for _, f := range files {
+		// Mirror covers Telegram files only; disk bytes live on this
+		// server and have no channel message to copy from.
+		if f.StorageKind == "disk" {
+			continue
+		}
 		has, _ := s.db.HasBackupCopy(f.ID, acct.ID)
 		if has {
 			continue
@@ -494,6 +505,9 @@ func (s *Server) handleTelegramMirror(w http.ResponseWriter, r *http.Request) {
 // to every ready backup account when the mirror toggle is on. It never
 // blocks or fails the upload: any error is recorded on the job.
 func (s *Server) maybeMirrorNewFile(file db.File) {
+	if file.StorageKind == "disk" {
+		return
+	}
 	raw, _ := s.db.GetSetting("multi_account_mirror")
 	if raw != "1" {
 		return

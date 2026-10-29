@@ -33,7 +33,7 @@ func (d *DB) IsFavorite(fileID string) (bool, error) {
 func (d *DB) ListFavoriteFiles() ([]File, error) {
 	rows, err := d.Query(`
 		SELECT f.id, f.folder_id, f.name, f.size, f.mime_type, f.telegram_message_id,
-		       f.telegram_file_id, f.telegram_access_hash, f.sha256, f.created_at, f.updated_at
+		       f.telegram_file_id, f.telegram_access_hash, f.sha256, f.storage_kind, f.local_path, f.created_at, f.updated_at
 		FROM favorites fav JOIN files f ON f.id = fav.file_id
 		WHERE f.deleted_at IS NULL ORDER BY fav.created_at DESC
 	`)
@@ -44,7 +44,7 @@ func (d *DB) ListFavoriteFiles() ([]File, error) {
 	var out []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -75,7 +75,7 @@ type TrashedFile struct {
 func (d *DB) ListTrashedFiles() ([]TrashedFile, error) {
 	rows, err := d.Query(`
 		SELECT f.id, f.folder_id, f.name, f.size, f.mime_type, f.telegram_message_id,
-		       f.telegram_file_id, f.telegram_access_hash, f.sha256, f.created_at, f.updated_at,
+		       f.telegram_file_id, f.telegram_access_hash, f.sha256, f.storage_kind, f.local_path, f.created_at, f.updated_at,
 		       COALESCE(fo.name, '')
 		FROM files f LEFT JOIN folders fo ON fo.id = f.folder_id
 		WHERE f.deleted_at IS NOT NULL ORDER BY f.deleted_at DESC
@@ -87,7 +87,7 @@ func (d *DB) ListTrashedFiles() ([]TrashedFile, error) {
 	var out []TrashedFile
 	for rows.Next() {
 		var t TrashedFile
-		if err := rows.Scan(&t.ID, &t.FolderID, &t.Name, &t.Size, &t.MimeType, &t.TelegramMessageID, &t.TelegramFileID, &t.TelegramAccessHash, &t.SHA256, &t.CreatedAt, &t.UpdatedAt, &t.FolderName); err != nil {
+		if err := rows.Scan(&t.ID, &t.FolderID, &t.Name, &t.Size, &t.MimeType, &t.TelegramMessageID, &t.TelegramFileID, &t.TelegramAccessHash, &t.SHA256, &t.StorageKind, &t.LocalPath, &t.CreatedAt, &t.UpdatedAt, &t.FolderName); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -420,7 +420,7 @@ func (d *DB) ListDuplicateGroups() ([]DuplicateGroup, error) {
 
 func (d *DB) ListFilesBySHA(sha string) ([]File, error) {
 	rows, err := d.Query(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE sha256 = ? AND deleted_at IS NULL ORDER BY created_at DESC
 	`, sha)
 	if err != nil {
@@ -430,7 +430,7 @@ func (d *DB) ListFilesBySHA(sha string) ([]File, error) {
 	var out []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -490,7 +490,7 @@ func (d *DB) LargestFiles(limit int) ([]File, error) {
 		limit = 10
 	}
 	rows, err := d.Query(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE deleted_at IS NULL ORDER BY size DESC LIMIT ?
 	`, limit)
 	if err != nil {
@@ -500,7 +500,7 @@ func (d *DB) LargestFiles(limit int) ([]File, error) {
 	var out []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -602,7 +602,7 @@ func (d *DB) RecentFiles(limit int) ([]File, error) {
 		limit = 10
 	}
 	rows, err := d.Query(`
-		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, created_at, updated_at
+		SELECT id, folder_id, name, size, mime_type, telegram_message_id, telegram_file_id, telegram_access_hash, sha256, storage_kind, local_path, created_at, updated_at
 		FROM files WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?
 	`, limit)
 	if err != nil {
@@ -612,7 +612,7 @@ func (d *DB) RecentFiles(limit int) ([]File, error) {
 	var out []File
 	for rows.Next() {
 		var f File
-		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FolderID, &f.Name, &f.Size, &f.MimeType, &f.TelegramMessageID, &f.TelegramFileID, &f.TelegramAccessHash, &f.SHA256, &f.StorageKind, &f.LocalPath, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
